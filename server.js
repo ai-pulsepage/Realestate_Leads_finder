@@ -1,64 +1,95 @@
-const express = require('express');
-const { pool, checkDatabase } = require('./config/database');
+console.log('=== SERVER STARTUP ===');
+console.log('Node:', process.version);
+console.log('PORT:', process.env.PORT);
 
-const app = express();
-app.use(express.json());
+try {
+  console.log('Loading express...');
+  const express = require('express');
+  console.log('✓ Express loaded');
 
-app.get('/', (req, res) => {
-  res.json({ status: 'ok', service: 'Real Estate Leads API', version: '1.0.0' });
-});
+  console.log('Loading database config...');
+  const { pool, checkDatabase } = require('./config/database');
+  console.log('✓ Database config loaded');
 
-app.get('/health', async (req, res) => {
-  const health = {
-    status: 'healthy',
-    uptime: process.uptime(),
-    database: pool ? 'configured' : 'not configured',
-    environment: process.env.NODE_ENV || 'development'
-  };
-  
-  if (pool) {
-    try {
-      await pool.query('SELECT 1');
-      health.database = 'connected';
-    } catch (err) {
-      health.database = 'error';
-      health.database_error = err.message;
-    }
-  }
-  
-  res.json(health);
-});
+  const app = express();
+  app.use(express.json());
 
-// Load all routes
-const propertiesRoutes = require('./routes/properties');
-const usersRoutes = require('./routes/users');
-const stripeRoutes = require('./routes/stripe');
-const profilesRoutes = require('./routes/profiles');
-const aiRoutes = require('./routes/ai');
-const adminRoutes = require('./routes/admin');
-
-app.use('/api/properties', checkDatabase, propertiesRoutes);
-app.use('/api/users', checkDatabase, usersRoutes);
-app.use('/api/profiles', checkDatabase, profilesRoutes);
-app.use('/api/ai', checkDatabase, aiRoutes);
-app.use('/api/admin', checkDatabase, adminRoutes);
-app.use('/api/stripe', stripeRoutes); // No DB check for webhooks
-
-// Global error handler
-app.use((err, req, res, next) => {
-  console.error('Unhandled error:', err);
-  res.status(err.status || 500).json({
-    error: process.env.NODE_ENV === 'production' ? 'Internal server error' : err.message
+  app.get('/', (req, res) => {
+    res.json({ status: 'ok', service: 'Real Estate Leads API', version: '1.0.0' });
   });
-});
 
-const PORT = process.env.PORT || 8080;
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on port ${PORT}`);
-});
+  app.get('/health', async (req, res) => {
+    const health = {
+      status: 'healthy',
+      uptime: process.uptime(),
+      database: pool ? 'configured' : 'not configured',
+      environment: process.env.NODE_ENV || 'development'
+    };
+    if (pool) {
+      try {
+        await pool.query('SELECT 1');
+        health.database = 'connected';
+      } catch (err) {
+        health.database = 'error';
+      }
+    }
+    res.json(health);
+  });
 
-process.on('SIGTERM', async () => {
-  console.log('SIGTERM received');
-  if (pool) await pool.end();
-  process.exit(0);
-});
+  console.log('Loading routes...');
+  
+  console.log('  Loading properties...');
+  const propertiesRoutes = require('./routes/properties');
+  console.log('  ✓ Properties');
+
+  console.log('  Loading users...');
+  const usersRoutes = require('./routes/users');
+  console.log('  ✓ Users');
+
+  console.log('  Loading stripe...');
+  const stripeRoutes = require('./routes/stripe');
+  console.log('  ✓ Stripe');
+
+  console.log('  Loading profiles...');
+  const profilesRoutes = require('./routes/profiles');
+  console.log('  ✓ Profiles');
+
+  console.log('  Loading ai...');
+  const aiRoutes = require('./routes/ai');
+  console.log('  ✓ AI');
+
+  console.log('  Loading admin...');
+  const adminRoutes = require('./routes/admin');
+  console.log('  ✓ Admin');
+
+  console.log('Mounting routes...');
+  app.use('/api/properties', checkDatabase, propertiesRoutes);
+  app.use('/api/users', checkDatabase, usersRoutes);
+  app.use('/api/stripe', stripeRoutes);
+  app.use('/api/profiles', checkDatabase, profilesRoutes);
+  app.use('/api/ai', checkDatabase, aiRoutes);
+  app.use('/api/admin', checkDatabase, adminRoutes);
+  console.log('✓ Routes mounted');
+
+  app.use((err, req, res, next) => {
+    console.error('ERROR:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  });
+
+  const PORT = process.env.PORT || 8080;
+  console.log('Starting server on port', PORT);
+  
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log('✓✓✓ SERVER STARTED ✓✓✓');
+  });
+
+  process.on('SIGTERM', async () => {
+    console.log('SIGTERM received');
+    if (pool) await pool.end();
+    process.exit(0);
+  });
+
+} catch (err) {
+  console.error('FATAL STARTUP ERROR:', err);
+  process.exit(1);
+}
