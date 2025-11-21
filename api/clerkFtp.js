@@ -4,16 +4,25 @@
 const axios = require('axios');
 const redis = require('redis');
 
-const redisClient = redis.createClient({
+const redisClient = process.env.REDIS_HOST ? redis.createClient({
   host: process.env.REDIS_HOST,
   port: 6379
-});
+}) : null;
 
-redisClient.on('error', (err) => console.error('Redis error:', err));
+if (redisClient) {
+  redisClient.on('error', (err) => console.error('Redis error:', err));
+}
 
 async function fetchFtpFile(fileName, folderName) {
   const cacheKey = `clerk_ftp:${folderName}:${fileName}`;
-  const cached = await redisClient.get(cacheKey);
+  let cached = null;
+  if (redisClient) {
+    try {
+      cached = await redisClient.get(cacheKey);
+    } catch (err) {
+      console.error('Redis get error:', err);
+    }
+  }
   if (cached) {
     return JSON.parse(cached);
   }
@@ -26,7 +35,13 @@ async function fetchFtpFile(fileName, folderName) {
     }
   });
 
-  await redisClient.setEx(cacheKey, 86400, JSON.stringify(response.data));
+  if (redisClient) {
+    try {
+      await redisClient.setEx(cacheKey, 86400, JSON.stringify(response.data));
+    } catch (err) {
+      console.error('Redis set error:', err);
+    }
+  }
   return response.data;
 }
 

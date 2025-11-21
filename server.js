@@ -3,6 +3,13 @@
 
 const express = require('express');
 const { Pool } = require('pg');
+
+const pool = process.env.DATABASE_URL ? new Pool({
+  connectionString: process.env.DATABASE_URL
+}) : null;
+
+module.exports = { pool };
+
 const propertiesRoutes = require('./routes/properties');
 const usersRoutes = require('./routes/users');
 const stripeRoutes = require('./routes/stripe');
@@ -12,10 +19,6 @@ const adminRoutes = require('./routes/admin');
 
 const app = express();
 app.use(express.json());
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL
-});
 
 app.use('/api/properties', propertiesRoutes);
 app.use('/api/users', usersRoutes);
@@ -28,5 +31,3 @@ const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
-
-module.exports = { pool };
