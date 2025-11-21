@@ -29,16 +29,28 @@ app.get('/health', async (req, res) => {
   res.json(health);
 });
 
-// ADD THESE ROUTES
+// Load all routes
 const propertiesRoutes = require('./routes/properties');
 const usersRoutes = require('./routes/users');
-const profilesRoutes = require('./routes/profiles');
 const stripeRoutes = require('./routes/stripe');
+const profilesRoutes = require('./routes/profiles');
+const aiRoutes = require('./routes/ai');
+const adminRoutes = require('./routes/admin');
 
 app.use('/api/properties', checkDatabase, propertiesRoutes);
 app.use('/api/users', checkDatabase, usersRoutes);
 app.use('/api/profiles', checkDatabase, profilesRoutes);
-app.use('/api/stripe', stripeRoutes); // Stripe doesn't need DB check
+app.use('/api/ai', checkDatabase, aiRoutes);
+app.use('/api/admin', checkDatabase, adminRoutes);
+app.use('/api/stripe', stripeRoutes); // No DB check for webhooks
+
+// Global error handler
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err);
+  res.status(err.status || 500).json({
+    error: process.env.NODE_ENV === 'production' ? 'Internal server error' : err.message
+  });
+});
 
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, '0.0.0.0', () => {
