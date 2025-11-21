@@ -2,20 +2,7 @@
 // Main entry point
 
 const express = require('express');
-const { Pool } = require('pg');
-
-const pool = process.env.DATABASE_URL ? new Pool({
-  connectionString: process.env.DATABASE_URL
-}) : null;
-
-module.exports = { pool };
-
-const propertiesRoutes = require('./routes/properties');
-const usersRoutes = require('./routes/users');
-const stripeRoutes = require('./routes/stripe');
-const profilesRoutes = require('./routes/profiles');
-const aiRoutes = require('./routes/ai');
-const adminRoutes = require('./routes/admin');
+const { pool, checkDatabase } = require('./config/database');
 
 const app = express();
 app.use(express.json());
@@ -35,39 +22,55 @@ app.get('/health', async (req, res) => {
     status: 'healthy',
     uptime: process.uptime(),
     timestamp: Date.now(),
-    database: 'checking',
+    database: pool ? 'configured' : 'not configured',
     environment: process.env.NODE_ENV || 'development'
   };
 
-  // Check database connection
-  const testPool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-  });
-
-  try {
-    await testPool.query('SELECT 1');
-    health.database = 'connected';
-  } catch (err) {
-    health.database = 'disconnected';
-    health.database_error = err.message;
-  } finally {
-    await testPool.end();
+  if (pool) {
+    try {
+      await pool.query('SELECT 1');
+      health.database = 'connected';
+    } catch (err) {
+      health.database = 'error';
+      health.database_error = err.message;
+    }
   }
 
   res.json(health);
 });
 
-app.use('/api/properties', propertiesRoutes);
-app.use('/api/users', usersRoutes);
-app.use('/api/stripe', stripeRoutes);
-app.use('/api/profiles', profilesRoutes);
-app.use('/api/ai', aiRoutes);
-app.use('/api/admin', adminRoutes);
+// Load routes
+const propertiesRoutes = require('./routes/properties');
+const usersRoutes = require('./routes/users');
+const stripeRoutes = require('./routes/stripe');
+const profilesRoutes = require('./routes/profiles');
+const aiRoutes = require('./routes/ai');
+const adminRoutes = require('./routes/admin');
+
+// Apply database check middleware to routes that need it
+app.use('/api/properties', checkDatabase, propertiesRoutes);
+app.use('/api/users', checkDatabase, usersRoutes);
+app.use('/api/profiles', checkDatabase, profilesRoutes);
+app.use('/api/ai', checkDatabase, aiRoutes);
+app.use('/api/admin', checkDatabase, adminRoutes);
+app.use('/api/stripe', stripeRoutes); // Stripe webhook doesn't need DB immediately
+
+// Global error handler
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err);
+  res.status(err.status || 500).json({
+    error: process.env.NODE_ENV === 'production'
+      ? 'Internal server error'
+      : err.message,
+    ...(process.env.NODE_ENV !== 'production' && { stack: err.stack })
+  });
+});
 
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`Database: ${pool ? 'configured' : 'NOT configured'}`);
 });
 
 // Graceful shutdown for Cloud Run

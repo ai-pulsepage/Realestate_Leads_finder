@@ -16,7 +16,8 @@
     "redis": "^4.6.0",
     "googleapis": "^118.0.0",
     "helmet": "^7.1.0",
-    "cors": "^2.8.5"
+    "cors": "^2.8.5",
+    "stripe": "^14.0.0"
   },
   "devDependencies": {
     "jest": "^29.7.0"
