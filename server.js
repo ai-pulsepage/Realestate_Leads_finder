@@ -31,9 +31,11 @@ app.get('/health', async (req, res) => {
 
 // ADD THESE ROUTES
 const propertiesRoutes = require('./routes/properties');
+const usersRoutes = require('./routes/users');
 const profilesRoutes = require('./routes/profiles');
 
 app.use('/api/properties', checkDatabase, propertiesRoutes);
+app.use('/api/users', checkDatabase, usersRoutes);
 app.use('/api/profiles', checkDatabase, profilesRoutes);
 
 const PORT = process.env.PORT || 8080;
