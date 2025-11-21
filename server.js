@@ -5,6 +5,9 @@ console.log('PORT:', process.env.PORT);
 const express = require('express');
 console.log('✓ Express loaded');
 
+const { pool, checkDatabase } = require('./config/database');
+console.log('✓ Database config loaded');
+
 const app = express();
 app.use(express.json());
 console.log('✓ Express app created');
