@@ -1,59 +1,45 @@
-console.log('=== Starting Minimal Server ===');
-console.log('Node version:', process.version);
-console.log('PORT:', process.env.PORT);
-
 const express = require('express');
-console.log('✓ Express loaded');
-
 const { pool, checkDatabase } = require('./config/database');
-console.log('✓ Database config loaded');
 
 const app = express();
 app.use(express.json());
-console.log('✓ Express app created');
 
-// Health endpoints only - NO route imports
 app.get('/', (req, res) => {
-  res.json({ 
-    status: 'ok', 
-    service: 'Real Estate Leads API - MINIMAL',
-    version: '1.0.0',
-    timestamp: new Date().toISOString()
-  });
+  res.json({ status: 'ok', service: 'Real Estate Leads API', version: '1.0.0' });
 });
 
-app.get('/health', (req, res) => {
-  res.json({
+app.get('/health', async (req, res) => {
+  const health = {
     status: 'healthy',
     uptime: process.uptime(),
-    timestamp: Date.now(),
-    environment: process.env.NODE_ENV || 'development',
-    message: 'Minimal server - route files disabled for testing'
-  });
+    database: pool ? 'configured' : 'not configured',
+    environment: process.env.NODE_ENV || 'development'
+  };
+  
+  if (pool) {
+    try {
+      await pool.query('SELECT 1');
+      health.database = 'connected';
+    } catch (err) {
+      health.database = 'error';
+      health.database_error = err.message;
+    }
+  }
+  
+  res.json(health);
 });
 
-console.log('✓ Health routes added');
+// ADD ONLY THIS ONE ROUTE
+const profilesRoutes = require('./routes/profiles');
+app.use('/api/profiles', checkDatabase, profilesRoutes);
 
 const PORT = process.env.PORT || 8080;
-
-console.log('=== Starting HTTP Server ===');
-
 app.listen(PORT, '0.0.0.0', () => {
-  console.log('✓✓✓ MINIMAL SERVER STARTED SUCCESSFULLY ✓✓✓');
   console.log(`Server running on port ${PORT}`);
 });
 
-process.on('SIGTERM', () => {
+process.on('SIGTERM', async () => {
   console.log('SIGTERM received');
+  if (pool) await pool.end();
   process.exit(0);
-});
-
-process.on('uncaughtException', (err) => {
-  console.error('UNCAUGHT EXCEPTION:', err);
-  process.exit(1);
-});
-
-process.on('unhandledRejection', (reason) => {
-  console.error('UNHANDLED REJECTION:', reason);
-  process.exit(1);
 });
