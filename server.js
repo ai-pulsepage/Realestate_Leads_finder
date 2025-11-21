@@ -33,10 +33,12 @@ app.get('/health', async (req, res) => {
 const propertiesRoutes = require('./routes/properties');
 const usersRoutes = require('./routes/users');
 const profilesRoutes = require('./routes/profiles');
+const stripeRoutes = require('./routes/stripe');
 
 app.use('/api/properties', checkDatabase, propertiesRoutes);
 app.use('/api/users', checkDatabase, usersRoutes);
 app.use('/api/profiles', checkDatabase, profilesRoutes);
+app.use('/api/stripe', stripeRoutes); // Stripe doesn't need DB check
 
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, '0.0.0.0', () => {
