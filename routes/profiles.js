@@ -79,3 +79,27 @@ router.put('/:user_id', async (req, res) => {
 });
 
 module.exports = router;
+
+// DELETE /api/profiles/:user_id - Delete profile
+router.delete('/:user_id', async (req, res) => {
+  try {
+    const { user_id } = req.params;
+    const result = await req.pool.query(
+      'DELETE FROM subscriber_profiles WHERE user_id = $1 RETURNING user_id',
+      [user_id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Profile not found' });
+    }
+
+    res.json({ 
+      success: true, 
+      message: 'Profile deleted',
+      user_id: result.rows[0].user_id 
+    });
+  } catch (err) {
+    console.error('Profile delete error:', err);
+    res.status(500).json({ error: 'Database delete failed' });
+  }
+});

@@ -97,3 +97,27 @@ router.put('/:id', async (req, res) => {
 });
 
 module.exports = router;
+
+// DELETE /api/properties/:id - Delete property
+router.delete('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await req.pool.query(
+      'DELETE FROM properties WHERE property_id = $1 RETURNING property_id',
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Property not found' });
+    }
+
+    res.json({ 
+      success: true, 
+      message: 'Property deleted',
+      property_id: result.rows[0].property_id 
+    });
+  } catch (err) {
+    console.error('Property delete error:', err);
+    res.status(500).json({ error: 'Database delete failed' });
+  }
+});
