@@ -1,10 +1,9 @@
 // Users Routes
-// POST /api/users - Signup
-
 const express = require('express');
 
 const router = express.Router();
 
+// POST /api/users - Create new user
 router.post('/', async (req, res) => {
   try {
     const { email, password_hash, subscription_tier } = req.body;
@@ -16,6 +15,61 @@ router.post('/', async (req, res) => {
   } catch (err) {
     console.error('User creation error:', err);
     res.status(500).json({ error: 'Database query failed' });
+  }
+});
+
+// GET /api/users/:id - Get single user
+router.get('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await req.pool.query(
+      'SELECT user_id, email, subscription_tier, subscription_status, token_balance, created_at, last_login FROM users WHERE user_id = $1',
+      [id]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('User lookup error:', err);
+    res.status(500).json({ error: 'Database query failed' });
+  }
+});
+
+// PUT /api/users/:id - Update user
+router.put('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { 
+      email,
+      subscription_tier,
+      subscription_status,
+      token_balance,
+      stripe_customer_id
+    } = req.body;
+
+    const result = await req.pool.query(
+      `UPDATE users 
+       SET email = COALESCE($1, email),
+           subscription_tier = COALESCE($2, subscription_tier),
+           subscription_status = COALESCE($3, subscription_status),
+           token_balance = COALESCE($4, token_balance),
+           stripe_customer_id = COALESCE($5, stripe_customer_id)
+       WHERE user_id = $6
+       RETURNING user_id, email, subscription_tier, subscription_status, token_balance, created_at, last_login`,
+      [email, subscription_tier, subscription_status, token_balance, stripe_customer_id, id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('User update error:', err);
+    res.status(500).json({ error: 'Database update failed' });
   }
 });
 
