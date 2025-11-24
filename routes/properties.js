@@ -36,6 +36,37 @@ router.get('/', async (req, res) => {
   }
 });
 
+// POST /api/properties - Create new property
+router.post('/', async (req, res) => {
+  try {
+    const { 
+      address, 
+      zip_code, 
+      county, 
+      owner_name, 
+      sale_price, 
+      property_type,
+      latitude,
+      longitude,
+      distressed_score,
+      source 
+    } = req.body;
+
+    const result = await req.pool.query(
+      `INSERT INTO properties 
+       (address, zip_code, county, owner_name, sale_price, property_type, latitude, longitude, distressed_score, source) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) 
+       RETURNING *`,
+      [address, zip_code, county, owner_name, sale_price, property_type, latitude, longitude, distressed_score, source || 'manual']
+    );
+
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error('Property creation error:', err);
+    res.status(500).json({ error: 'Database insert failed' });
+  }
+});
+
 // GET /api/properties/:id - Get single property
 router.get('/:id', async (req, res) => {
   try {
@@ -96,8 +127,6 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-module.exports = router;
-
 // DELETE /api/properties/:id - Delete property
 router.delete('/:id', async (req, res) => {
   try {
@@ -121,3 +150,5 @@ router.delete('/:id', async (req, res) => {
     res.status(500).json({ error: 'Database delete failed' });
   }
 });
+
+module.exports = router;
