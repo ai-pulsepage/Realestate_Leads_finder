@@ -65,7 +65,7 @@ try {
   console.log('Mounting routes...');
   app.use('/api/properties', checkDatabase, propertiesRoutes);
   app.use('/api/users', checkDatabase, usersRoutes);
-  app.use('/api/stripe', stripeRoutes);
+  app.use('/api/stripe', checkDatabase, stripeRoutes);
   app.use('/api/profiles', checkDatabase, profilesRoutes);
   app.use('/api/ai', checkDatabase, aiRoutes);
   app.use('/api/admin', checkDatabase, adminRoutes);
