@@ -60,6 +60,7 @@ try {
 
   console.log('  Loading admin...');
   const adminRoutes = require('./routes/admin');
+const savedLeadsRoutes = require('./routes/saved-leads');
   console.log('  ✓ Admin');
 
   console.log('Mounting routes...');
@@ -69,6 +70,7 @@ try {
   app.use('/api/profiles', checkDatabase, profilesRoutes);
   app.use('/api/ai', checkDatabase, aiRoutes);
   app.use('/api/admin', checkDatabase, adminRoutes);
+  app.use('/api/saved-leads', checkDatabase, savedLeadsRoutes);
   console.log('✓ Routes mounted');
 
   app.use((err, req, res, next) => {
