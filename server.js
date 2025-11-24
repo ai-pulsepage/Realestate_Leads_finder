@@ -60,8 +60,12 @@ try {
 
   console.log('  Loading admin...');
   const adminRoutes = require('./routes/admin');
-const savedLeadsRoutes = require('./routes/saved-leads');
+  const savedLeadsRoutes = require('./routes/saved-leads');
   console.log('  ✓ Admin');
+
+  console.log('  Loading voice-ai...');
+  const voiceAiRoutes = require('./routes/voice-ai');
+  console.log('  ✓ Voice AI');
 
   console.log('Mounting routes...');
   app.use('/api/properties', checkDatabase, propertiesRoutes);
@@ -71,6 +75,7 @@ const savedLeadsRoutes = require('./routes/saved-leads');
   app.use('/api/ai', checkDatabase, aiRoutes);
   app.use('/api/admin', checkDatabase, adminRoutes);
   app.use('/api/saved-leads', checkDatabase, savedLeadsRoutes);
+  app.use('/api/voice-ai', checkDatabase, voiceAiRoutes);
   console.log('✓ Routes mounted');
 
   app.use((err, req, res, next) => {
