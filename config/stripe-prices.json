@@ -1,0 +1,31 @@
+{
+  "subscriptions": {
+    "contractor": {
+      "monthly": "price_1SX0jdGucWajUqZi9dehwasA",
+      "yearly": "price_1SX0jdGucWajUqZieUBif6lp",
+      "tokens": 20000
+    },
+    "investor": {
+      "monthly": "price_1SX0jeGucWajUqZiZ2sYeaMz",
+      "yearly": "price_1SX0jeGucWajUqZiyC1g8rSp",
+      "tokens": 20000
+    },
+    "combined": {
+      "monthly": "price_1SX0jfGucWajUqZiaAIXM090",
+      "yearly": "price_1SX0jfGucWajUqZiDTE44I97",
+      "tokens": 40000
+    }
+  },
+  "tokenPackages": {
+    "5000": {
+      "priceId": "price_1SX0jfGucWajUqZiYWhensyB",
+      "tokens": 5000,
+      "amount": 1000
+    },
+    "10000": {
+      "priceId": "price_1SX0jgGucWajUqZiK1RR8IzK",
+      "tokens": 10000,
+      "amount": 2000
+    }
+  }
+}
