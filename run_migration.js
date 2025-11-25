@@ -7,7 +7,7 @@ const fs = require('fs');
 const path = require('path');
 
 const pool = new Pool({
-  host: '127.0.0.1',
+  host: '172.27.64.3',
   port: 5432,
   database: 'real_estate_leads',
   user: 'api_user',
