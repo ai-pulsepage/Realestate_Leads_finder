@@ -127,40 +127,10 @@ router.post('/incoming', checkTokenBalance, async (req, res) => {
       [userId]
     );
 
-    const knowledgeBase = knowledgeQuery.rows.length > 0
-      ? knowledgeQuery.rows[0].knowledge_data
-      : {};
+    // Redirect to language menu
+    twiml.redirect('/api/voice-ai/language-menu');
 
-    // Initial greeting using knowledge base
-    const companyName = knowledgeBase.company_name || 'Real Estate Services';
-    const greeting = `Hello, thank you for calling ${companyName}. I'm your AI assistant. How can I help you today?`;
-
-    twiml.say({
-      voice: 'Polly.Joanna',
-      language: 'en-US'
-    }, greeting);
-
-    // Gather caller's response
-    const gather = twiml.gather({
-      input: 'speech',
-      action: '/api/voice-ai/process-response',
-      method: 'POST',
-      timeout: 5,
-      speechTimeout: 'auto',
-      language: 'en-US'
-    });
-
-    gather.say({
-      voice: 'Polly.Joanna',
-      language: 'en-US'
-    }, 'Please tell me what you need help with.');
-
-    // If no response, prompt again
-    twiml.say({
-      voice: 'Polly.Joanna',
-      language: 'en-US'
-    }, 'I didn\'t hear anything. Please call back when you\'re ready.');
-
+    console.log('✅ Redirecting to language menu');
     res.type('text/xml');
     res.send(twiml.toString());
 
@@ -179,7 +149,188 @@ router.post('/incoming', checkTokenBalance, async (req, res) => {
 });
 
 // ============================================================
-// ROUTE 2: Process Caller Response
+// ROUTE 2: Language Menu System
+// Twilio webhook: POST /api/voice-ai/language-menu
+// ============================================================
+
+/**
+ * POST /api/voice-ai/language-menu
+ * Plays language selection menu and waits for DTMF input
+ */
+router.post('/language-menu', async (req, res) => {
+  console.log('📞 Language menu requested');
+  console.log('Request body:', req.body);
+
+  try {
+    const { To, From, CallSid } = req.body;
+
+    // Extract subscriber's phone number (the To number)
+    const subscriberNumber = To;
+
+    // Look up subscriber by phone number
+    const connection = await req.pool.getConnection();
+    try {
+      const [profiles] = await connection.query(
+        'SELECT user_id FROM subscriber_profiles WHERE twilio_phone_number = ?',
+        [subscriberNumber]
+      );
+
+      if (profiles.length === 0) {
+        console.error('❌ No subscriber found for number:', subscriberNumber);
+        const twiml = new twilio.twiml.VoiceResponse();
+        twiml.say('We\'re sorry, but this number is not configured. Please contact support.');
+        twiml.hangup();
+        return res.type('text/xml').send(twiml.toString());
+      }
+
+      const userId = profiles[0].user_id;
+
+      // Load knowledge data
+      const [knowledge] = await connection.query(
+        'SELECT knowledge_data FROM subscriber_knowledge_base WHERE user_id = ?',
+        [userId]
+      );
+
+      if (knowledge.length === 0) {
+        console.error('❌ No knowledge data found for user:', userId);
+        const twiml = new twilio.twiml.VoiceResponse();
+        twiml.say('We\'re sorry, but the system is not configured. Please contact support.');
+        twiml.hangup();
+        return res.type('text/xml').send(twiml.toString());
+      }
+
+      const knowledgeData = knowledge[0].knowledge_data;
+
+      // Import utility functions
+      const { getLanguageMenuPrompt } = require('../utils/voice-customization');
+
+      // Get language menu prompt
+      const menuPrompt = getLanguageMenuPrompt(knowledgeData);
+
+      // Create TwiML response
+      const twiml = new twilio.twiml.VoiceResponse();
+
+      // Use <Gather> to collect DTMF input
+      const gather = twiml.gather({
+        input: 'dtmf',
+        numDigits: 1,
+        action: '/api/voice-ai/language-selected',
+        method: 'POST',
+        timeout: 5
+      });
+
+      gather.say({ voice: 'Polly.Joanna' }, menuPrompt);
+
+      // If no input, repeat the menu
+      twiml.redirect('/api/voice-ai/language-menu');
+
+      console.log('✅ Language menu TwiML generated');
+      res.type('text/xml').send(twiml.toString());
+
+    } finally {
+      connection.release();
+    }
+
+  } catch (error) {
+    console.error('❌ Error in language menu:', error);
+    const twiml = new twilio.twiml.VoiceResponse();
+    twiml.say('We\'re sorry, an error occurred. Please try again later.');
+    twiml.hangup();
+    res.type('text/xml').send(twiml.toString());
+  }
+});
+
+// ============================================================
+// ROUTE 3: Language Selection Handler
+// Twilio webhook: POST /api/voice-ai/language-selected
+// ============================================================
+
+/**
+ * POST /api/voice-ai/language-selected
+ * Processes DTMF language selection and routes to appropriate conversation
+ */
+router.post('/language-selected', async (req, res) => {
+  console.log('🔢 Language selected');
+  console.log('Request body:', req.body);
+
+  try {
+    const { To, From, CallSid, Digits } = req.body;
+
+    // Map DTMF digits to language codes
+    const languageMap = {
+      '1': 'en',
+      '2': 'es'
+    };
+
+    const selectedLanguage = languageMap[Digits] || 'en';
+    console.log(`✅ Language selected: ${selectedLanguage} (Digits: ${Digits})`);
+
+    // Extract subscriber's phone number
+    const subscriberNumber = To;
+
+    // Look up subscriber
+    const connection = await req.pool.getConnection();
+    try {
+      const [profiles] = await connection.query(
+        'SELECT user_id FROM subscriber_profiles WHERE twilio_phone_number = ?',
+        [subscriberNumber]
+      );
+
+      if (profiles.length === 0) {
+        console.error('❌ No subscriber found for number:', subscriberNumber);
+        const twiml = new twilio.twiml.VoiceResponse();
+        twiml.say('We\'re sorry, but this number is not configured.');
+        twiml.hangup();
+        return res.type('text/xml').send(twiml.toString());
+      }
+
+      const userId = profiles[0].user_id;
+
+      // Load knowledge data
+      const [knowledge] = await connection.query(
+        'SELECT knowledge_data FROM subscriber_knowledge_base WHERE user_id = ?',
+        [userId]
+      );
+
+      const knowledgeData = knowledge[0].knowledge_data;
+
+      // Import utility functions
+      const { getCustomGreeting } = require('../utils/voice-customization');
+
+      // Get custom greeting for selected language
+      const customGreeting = getCustomGreeting(knowledgeData, selectedLanguage);
+
+      // Create TwiML response
+      const twiml = new twilio.twiml.VoiceResponse();
+
+      // Say custom greeting
+      const voice = selectedLanguage === 'es' ? 'Polly.Lupe' : 'Polly.Joanna';
+      twiml.say({ voice }, customGreeting);
+
+      // Connect to media stream with language parameter
+      const connect = twiml.connect();
+      connect.stream({
+        url: `wss://${req.get('host')}/api/voice-ai/media-stream?language=${selectedLanguage}&userId=${userId}`
+      });
+
+      console.log('✅ Connecting to media stream with language:', selectedLanguage);
+      res.type('text/xml').send(twiml.toString());
+
+    } finally {
+      connection.release();
+    }
+
+  } catch (error) {
+    console.error('❌ Error processing language selection:', error);
+    const twiml = new twilio.twiml.VoiceResponse();
+    twiml.say('We\'re sorry, an error occurred.');
+    twiml.hangup();
+    res.type('text/xml').send(twiml.toString());
+  }
+});
+
+// ============================================================
+// ROUTE 4: Process Caller Response
 // Twilio webhook: POST /api/voice-ai/process-response
 // ============================================================
 
@@ -965,6 +1116,117 @@ router.post('/voicemail-transcription', async (req, res) => {
     console.error('❌ Error processing transcription:', error);
     res.status(200).send('OK');
   }
+});
+
+// ============================================================
+// ROUTE 13: Media Stream Handler (WebSocket)
+// Twilio webhook: POST /api/voice-ai/media-stream
+// ============================================================
+
+router.post('/media-stream', (req, res) => {
+  console.log('🎙️ Media stream connection requested');
+
+  // Extract query parameters
+  const language = req.query.language || 'en';
+  const userId = req.query.userId;
+
+  console.log(`Language: ${language}, User ID: ${userId}`);
+
+  // WebSocket upgrade handler
+  res.on('upgrade', async (request, socket, head) => {
+    try {
+      // Load knowledge data for this user
+      const connection = await req.pool.getConnection();
+      let knowledgeData;
+
+      try {
+        const [knowledge] = await connection.query(
+          'SELECT knowledge_data FROM subscriber_knowledge_base WHERE user_id = ?',
+          [userId]
+        );
+
+        if (knowledge.length === 0) {
+          throw new Error('No knowledge data found for user');
+        }
+
+        knowledgeData = knowledge[0].knowledge_data;
+      } finally {
+        connection.release();
+      }
+
+      // Import utility functions
+      const { getBrandVoicePrompt } = require('../utils/voice-customization');
+
+      // Get brand voice system instruction for selected language
+      const systemInstruction = getBrandVoicePrompt(knowledgeData, language);
+
+      // ===============================================
+      // BRAND VOICE CONFIGURATION LOGGING
+      // ===============================================
+      console.log('===========================================');
+      console.log('BRAND VOICE CONFIGURATION');
+      console.log('===========================================');
+      console.log(`Company: ${knowledgeData.company_name}`);
+      console.log(`Brand Voice: ${knowledgeData.brand_voice}`);
+      console.log(`Language: ${language}`);
+      console.log(`System Instruction Preview:`);
+      console.log(systemInstruction.substring(0, 200) + '...');
+      console.log('===========================================');
+
+      // Initialize Gemini model
+      const { GoogleGenerativeAI } = require('@google/generative-ai');
+      const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+      const model = genAI.getGenerativeModel({
+        model: 'gemini-1.5-flash-latest', // FIXED: was 'gemini-1.5-flash'
+        systemInstruction: systemInstruction
+      });
+
+      // Voice configuration based on language
+      const voiceConfig = {
+        en: {
+          voiceName: 'Kore', // English voice
+          displayName: 'English Assistant'
+        },
+        es: {
+          voiceName: 'Puck', // Spanish voice
+          displayName: 'Asistente en Español'
+        }
+      };
+
+      const selectedVoice = voiceConfig[language] || voiceConfig.en;
+
+      const liveSession = model.startChat({
+        generationConfig: {
+          responseModalities: 'audio',
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: {
+                voiceName: selectedVoice.voiceName
+              }
+            }
+          }
+        }
+      });
+
+      console.log('✅ Gemini live session started');
+      console.log(`✅ Using voice: ${selectedVoice.displayName} (${selectedVoice.voiceName})`);
+
+      // ===============================================
+      // WEB SOCKET HANDLING (Placeholder - needs full implementation)
+      // ===============================================
+
+      // For now, just acknowledge the connection
+      // Full WebSocket implementation would go here
+      console.log('WebSocket upgrade requested - placeholder implementation');
+
+      // Reject the upgrade for now since full implementation is needed
+      socket.destroy();
+
+    } catch (error) {
+      console.error('❌ Error setting up media stream:', error);
+      socket.destroy();
+    }
+  });
 });
 
 module.exports = router;

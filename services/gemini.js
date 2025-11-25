@@ -24,7 +24,7 @@ async function generateVoiceResponse({
   intent = 'general_inquiry'
 }) {
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-latest' });
 
     // Build context-aware prompt
     const systemPrompt = buildSystemPrompt(knowledgeBase, intent);
@@ -72,7 +72,7 @@ RESPONSE:`;
  */
 async function extractContactData(transcript) {
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-latest' });
 
     const prompt = `
 Analyze this phone conversation transcript and extract contact information and intent.
