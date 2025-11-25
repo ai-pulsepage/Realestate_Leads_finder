@@ -1119,6 +1119,104 @@ router.post('/voicemail-transcription', async (req, res) => {
 });
 
 // ============================================================
+// AUDIO HANDLING FUNCTIONS
+// ============================================================
+
+const { decode: decodeMulaw, encode: encodeMulaw } = require('g711');
+
+/**
+ * Handle incoming audio from Twilio, process with Gemini, send response back
+ * @param {Object} mediaData - Twilio media data with base64 payload
+ * @param {Object} liveSession - Gemini live session
+ * @param {WebSocket} ws - WebSocket connection to Twilio
+ * @param {string} streamSid - Twilio stream SID
+ */
+async function handleIncomingAudio(mediaData, liveSession, ws, streamSid) {
+  try {
+    // Decode base64 μ-law audio from Twilio
+    const mulawBuffer = Buffer.from(mediaData.payload, 'base64');
+
+    // Convert μ-law to 16-bit PCM (Gemini expects PCM)
+    const pcmBuffer = decodeMulaw(mulawBuffer);
+
+    // Send to Gemini Live API
+    const response = await liveSession.sendMessage({
+      inlineData: {
+        mimeType: 'audio/pcm',
+        data: pcmBuffer.toString('base64')
+      }
+    });
+
+    // Get Gemini's audio response
+    if (response?.candidates?.[0]?.content?.parts?.[0]?.inlineData) {
+      const geminiAudioData = response.candidates[0].content.parts[0].inlineData.data;
+
+      // Convert PCM back to μ-law for Twilio
+      const pcmForEncode = Buffer.from(geminiAudioData, 'base64');
+      const mulawForTwilio = encodeMulaw(pcmForEncode);
+
+      // Send back to Twilio via WebSocket
+      ws.send(JSON.stringify({
+        event: 'media',
+        streamSid: streamSid,
+        media: {
+          payload: mulawForTwilio.toString('base64')
+        }
+      }));
+
+      console.log('🔊 Sent Gemini response to caller');
+    }
+  } catch (error) {
+    console.error('❌ Audio handling error:', error);
+  }
+}
+
+/**
+ * Finalize call logging and cleanup
+ * @param {Object} pool - Database connection pool
+ * @param {string} userId - User ID
+ * @param {string} callSid - Twilio call SID
+ * @param {string} language - Language code
+ */
+async function finalizeCall(pool, userId, callSid, language) {
+  try {
+    await pool.query(`
+      UPDATE ai_voice_call_logs
+      SET
+        call_status = 'completed',
+        end_time = NOW(),
+        duration_seconds = EXTRACT(EPOCH FROM (NOW() - start_time)),
+        language = $1
+      WHERE call_sid = $2 AND user_id = $3
+    `, [language, callSid, userId]);
+
+    console.log('✅ Call finalized:', callSid);
+  } catch (error) {
+    console.error('❌ Call finalization error:', error);
+  }
+}
+
+/**
+ * Generate error audio message for caller
+ * @param {string} message - Error message text
+ * @returns {string} Base64 encoded μ-law audio
+ */
+function generateErrorAudio(message) {
+  try {
+    // Create a simple TwiML response for error message
+    const twiml = new twilio.twiml.VoiceResponse();
+    twiml.say({ voice: 'Polly.Joanna' }, message);
+
+    // For now, return empty audio - in production you'd synthesize this
+    // This is a placeholder that should be replaced with actual TTS
+    return Buffer.from('').toString('base64');
+  } catch (error) {
+    console.error('❌ Error generating error audio:', error);
+    return Buffer.from('').toString('base64');
+  }
+}
+
+// ============================================================
 // ROUTE 13: Media Stream Handler (WebSocket)
 // Twilio webhook: POST /api/voice-ai/media-stream
 // ============================================================
@@ -1212,15 +1310,95 @@ router.post('/media-stream', (req, res) => {
       console.log(`✅ Using voice: ${selectedVoice.displayName} (${selectedVoice.voiceName})`);
 
       // ===============================================
-      // WEB SOCKET HANDLING (Placeholder - needs full implementation)
+      // WEB SOCKET HANDLING - FULL IMPLEMENTATION
       // ===============================================
 
-      // For now, just acknowledge the connection
-      // Full WebSocket implementation would go here
-      console.log('WebSocket upgrade requested - placeholder implementation');
+      const WebSocket = require('ws');
 
-      // Reject the upgrade for now since full implementation is needed
-      socket.destroy();
+      // Create WebSocket server
+      const wss = new WebSocket.Server({ noServer: true });
+
+      // Handle upgrade
+      wss.handleUpgrade(request, socket, head, (ws) => {
+        console.log('✅ WebSocket connection established');
+
+        let streamSid = null;
+        let callSid = request.url.split('callSid=')[1]?.split('&')[0] || 'unknown';
+
+        ws.on('message', async (message) => {
+          try {
+            const data = JSON.parse(message);
+
+            switch (data.event) {
+              case 'connected':
+                console.log('📞 Twilio connected');
+                break;
+
+              case 'start':
+                streamSid = data.start.streamSid;
+                callSid = data.start.callSid;
+                console.log('🎙️ Stream started:', streamSid);
+
+                // Log call start
+                await req.pool.query(`
+                  UPDATE ai_voice_call_logs
+                  SET stream_sid = $1, call_status = 'in-progress'
+                  WHERE call_sid = $2
+                `, [streamSid, callSid]);
+                break;
+
+              case 'media':
+                // Handle incoming audio from caller
+                await handleIncomingAudio(data.media, liveSession, ws, streamSid);
+                break;
+
+              case 'stop':
+                console.log('🛑 Stream stopped');
+                await finalizeCall(req.pool, userId, callSid, language);
+                ws.close();
+                break;
+            }
+          } catch (error) {
+            console.error('❌ WebSocket message error:', error);
+          }
+        });
+
+        ws.on('close', () => {
+          console.log('🔌 WebSocket connection closed');
+        });
+
+        ws.on('error', (error) => {
+          console.error('❌ WebSocket error:', error);
+        });
+
+        // Handle Gemini API errors
+        liveSession.on('error', (error) => {
+          console.error('❌ Gemini API error:', error);
+
+          // Send error message to caller
+          const errorAudio = generateErrorAudio(
+            "We're experiencing technical difficulties. Please try again later."
+          );
+
+          ws.send(JSON.stringify({
+            event: 'media',
+            media: { payload: errorAudio }
+          }));
+
+          ws.close();
+        });
+
+        // Handle unexpected disconnections
+        ws.on('close', async (code, reason) => {
+          console.log(`WebSocket closed: ${code} - ${reason}`);
+
+          await req.pool.query(`
+            UPDATE ai_voice_call_logs
+            SET call_status = 'disconnected'
+            WHERE call_sid = $1 AND call_status = 'in-progress'
+          `, [callSid]);
+        });
+      });
 
     } catch (error) {
       console.error('❌ Error setting up media stream:', error);
