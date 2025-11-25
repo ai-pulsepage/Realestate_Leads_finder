@@ -18,11 +18,9 @@ async function checkTokenBalance(req, res, next) {
     if (!twilioNumber) {
       return next();
     }
-
     const balanceQuery = await req.pool.query(`
-      SELECT sp.token_balance, u.user_id
+      SELECT u.token_balance, u.user_id
       FROM users u
-      JOIN subscriber_profiles sp ON u.user_id = sp.user_id
       WHERE u.twilio_phone_number = $1
     `, [twilioNumber]);
 
@@ -100,7 +98,7 @@ router.post('/incoming', checkTokenBalance, async (req, res) => {
 
     // Check token balance
     const balanceQuery = await req.pool.query(
-      'SELECT token_balance FROM subscriber_profiles WHERE user_id = $1',
+      'SELECT token_balance FROM users WHERE user_id = $1',
       [userId]
     );
 
