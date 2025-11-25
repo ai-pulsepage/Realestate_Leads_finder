@@ -145,6 +145,3 @@ try {
   console.error('FATAL STARTUP ERROR:', err);
   process.exit(1);
 }
-// TEMPORARY: Migration endpoints (remove after use)
-app.post('/admin/run-migration-006', async (req, res) => {
-  try {
