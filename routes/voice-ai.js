@@ -171,7 +171,7 @@ router.post('/language-menu', async (req, res) => {
     // PostgreSQL: Direct pool query
     try {
       const profileResult = await req.pool.query(
-        'SELECT user_id FROM subscriber_profiles WHERE twilio_phone_number = ?',
+        'SELECT user_id FROM subscriber_profiles WHERE twilio_phone_number = $1',
         [subscriberNumber]
       );
 
@@ -187,7 +187,7 @@ router.post('/language-menu', async (req, res) => {
 
       // Load knowledge data
       const knowledgeResult = await req.pool.query(
-        'SELECT knowledge_data FROM subscriber_knowledge_base WHERE user_id = ?',
+        'SELECT knowledge_data FROM subscriber_knowledge_base WHERE user_id = $1',
         [userId]
       );
 
@@ -272,7 +272,7 @@ router.post('/language-selected', async (req, res) => {
     // PostgreSQL: Direct pool query
     try {
       const profileResult = await req.pool.query(
-        'SELECT user_id FROM subscriber_profiles WHERE twilio_phone_number = ?',
+        'SELECT user_id FROM subscriber_profiles WHERE twilio_phone_number = $1',
         [subscriberNumber]
       );
 
@@ -288,7 +288,7 @@ router.post('/language-selected', async (req, res) => {
 
       // Load knowledge data
       const knowledgeResult = await req.pool.query(
-        'SELECT knowledge_data FROM subscriber_knowledge_base WHERE user_id = ?',
+        'SELECT knowledge_data FROM subscriber_knowledge_base WHERE user_id = $1',
         [userId]
       );
 
@@ -1141,7 +1141,7 @@ router.post('/media-stream', (req, res) => {
 
       try {
         const knowledgeResult = await req.pool.query(
-          'SELECT knowledge_data FROM subscriber_knowledge_base WHERE user_id = ?',
+          'SELECT knowledge_data FROM subscriber_knowledge_base WHERE user_id = $1',
           [userId]
         );
 
