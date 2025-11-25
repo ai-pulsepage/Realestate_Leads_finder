@@ -6,13 +6,65 @@
 const express = require('express');
 const router = express.Router();
 const VoiceResponse = require('twilio').twiml.VoiceResponse;
+const geminiService = require('../services/gemini');
+
+/**
+ * Middleware: Check token balance before processing call
+ */
+async function checkTokenBalance(req, res, next) {
+  try {
+    const twilioNumber = req.body.To;
+
+    if (!twilioNumber) {
+      return next();
+    }
+
+    const balanceQuery = await req.db.query(`
+      SELECT sp.token_balance, u.user_id
+      FROM users u
+      JOIN subscriber_profiles sp ON u.user_id = sp.user_id
+      WHERE u.twilio_phone_number = $1
+    `, [twilioNumber]);
+
+    if (balanceQuery.rows.length === 0) {
+      return next();
+    }
+
+    const { token_balance, user_id } = balanceQuery.rows[0];
+
+    // Require minimum 500 tokens (1 minute of call)
+    if (token_balance < 500) {
+      const twiml = new VoiceResponse();
+      twiml.say({
+        voice: 'Polly.Joanna',
+        language: 'en-US'
+      }, 'Your account has insufficient tokens. Please add more tokens to continue using Voice AI.');
+      twiml.hangup();
+
+      res.type('text/xml');
+      return res.send(twiml.toString());
+    }
+
+    // Attach user_id to request for later use
+    req.voiceAI = {
+      userId: user_id,
+      tokenBalance: token_balance
+    };
+
+    next();
+
+  } catch (error) {
+    console.error('❌ Token check error:', error);
+    next(); // Allow call to proceed on error
+  }
+}
 
 // ============================================================
 // ROUTE 1: Handle Incoming Calls
 // Twilio webhook: POST /api/voice-ai/incoming
 // ============================================================
 
-router.post('/incoming', async (req, res) => {
+router.post('/incoming', checkTokenBalance, async (req, res) => {
   try {
     console.log('📞 Incoming call webhook received:', {
       CallSid: req.body.CallSid,
@@ -519,6 +571,401 @@ router.post('/status-callback', async (req, res) => {
   } catch (error) {
     console.error('❌ Error in status callback:', error);
     res.status(200).send('OK'); // Always return 200 to Twilio
+  }
+});
+
+// ============================================================
+// ROUTE 7: Gemini-Powered Response
+// Twilio webhook: POST /api/voice-ai/gemini-response
+// ============================================================
+
+router.post('/gemini-response', async (req, res) => {
+  try {
+    console.log('🤖 Processing with Gemini AI');
+
+    const twiml = new VoiceResponse();
+    const callSid = req.body.CallSid;
+    const twilioNumber = req.body.To;
+
+    // Get subscriber and conversation history
+    const subscriberQuery = await req.db.query(`
+      SELECT u.user_id, skb.knowledge_data
+      FROM users u
+      LEFT JOIN subscriber_knowledge_base skb ON u.user_id = skb.user_id
+      WHERE u.twilio_phone_number = $1
+    `, [twilioNumber]);
+
+    if (subscriberQuery.rows.length === 0) {
+      twiml.say('Error processing request. Goodbye.');
+      res.type('text/xml');
+      return res.send(twiml.toString());
+    }
+
+    const userId = subscriberQuery.rows[0].user_id;
+    const knowledgeBase = subscriberQuery.rows[0].knowledge_data || {};
+
+    // Get conversation history
+    const historyQuery = await req.db.query(
+      'SELECT conversation_transcript FROM ai_voice_call_logs WHERE call_sid = $1',
+      [callSid]
+    );
+
+    const conversationHistory = historyQuery.rows.length > 0
+      ? historyQuery.rows[0].conversation_transcript
+      : '';
+
+    // Get last user query from transcript
+    const lines = conversationHistory.split('\n').filter(l => l.trim());
+    const lastLine = lines[lines.length - 1] || '';
+    const userQuery = lastLine.replace('Caller:', '').trim();
+
+    // Generate AI response
+    const aiResponse = await geminiService.generateVoiceResponse({
+      userQuery,
+      conversationHistory,
+      knowledgeBase,
+      intent: 'general_inquiry'
+    });
+
+    // Update transcript with AI response
+    await req.db.query(`
+      UPDATE ai_voice_call_logs
+      SET conversation_transcript = COALESCE(conversation_transcript, '') || $1 || '\n'
+      WHERE call_sid = $2
+    `, [`AI: ${aiResponse}`, callSid]);
+
+    // Speak the AI response
+    twiml.say({
+      voice: 'Polly.Joanna',
+      language: 'en-US'
+    }, aiResponse);
+
+    // Check if response indicates need for human transfer
+    if (geminiService.detectTransferRequest(aiResponse)) {
+      twiml.say({
+        voice: 'Polly.Joanna',
+        language: 'en-US'
+      }, 'Let me connect you with someone who can help.');
+
+      // In production, this would dial the subscriber's phone
+      // For now, just acknowledge
+      twiml.say({
+        voice: 'Polly.Joanna',
+        language: 'en-US'
+      }, 'I\'m transferring you now.');
+
+      // Placeholder for actual transfer
+      twiml.hangup();
+    } else {
+      // Continue conversation
+      twiml.say({
+        voice: 'Polly.Joanna',
+        language: 'en-US'
+      }, 'Is there anything else I can help you with?');
+
+      const gather = twiml.gather({
+        input: 'speech',
+        action: '/api/voice-ai/process-response',
+        method: 'POST',
+        timeout: 5,
+        speechTimeout: 'auto',
+        language: 'en-US'
+      });
+
+      gather.say({
+        voice: 'Polly.Joanna',
+        language: 'en-US'
+      }, 'Please tell me what you need help with.');
+    }
+
+    res.type('text/xml');
+    res.send(twiml.toString());
+
+  } catch (error) {
+    console.error('❌ Error in Gemini response:', error);
+
+    const twiml = new VoiceResponse();
+    twiml.say('Sorry, I had trouble processing that. Please try again.');
+
+    res.type('text/xml');
+    res.send(twiml.toString());
+  }
+});
+
+// ============================================================
+// ROUTE 8: Transfer to Human
+// Twilio webhook: POST /api/voice-ai/transfer-to-human
+// ============================================================
+
+router.post('/transfer-to-human', async (req, res) => {
+  try {
+    console.log('📲 Transferring call to human');
+
+    const twiml = new VoiceResponse();
+    const callSid = req.body.CallSid;
+    const twilioNumber = req.body.To;
+
+    // Get subscriber's phone number
+    const subscriberQuery = await req.db.query(`
+      SELECT u.user_id, u.email, skb.knowledge_data
+      FROM users u
+      LEFT JOIN subscriber_knowledge_base skb ON u.user_id = skb.user_id
+      WHERE u.twilio_phone_number = $1
+    `, [twilioNumber]);
+
+    if (subscriberQuery.rows.length === 0) {
+      twiml.say('Unable to transfer call. Please try again later.');
+      twiml.hangup();
+      res.type('text/xml');
+      return res.send(twiml.toString());
+    }
+
+    const knowledgeBase = subscriberQuery.rows[0].knowledge_data || {};
+    const forwardNumber = knowledgeBase.forward_phone_number || knowledgeBase.phone_number;
+
+    if (!forwardNumber) {
+      twiml.say('Sorry, no transfer number is configured. Please call back during business hours.');
+      twiml.hangup();
+      res.type('text/xml');
+      return res.send(twiml.toString());
+    }
+
+    // Update call log
+    await req.db.query(`
+      UPDATE ai_voice_call_logs
+      SET call_outcome = 'transferred_to_human'
+      WHERE call_sid = $1
+    `, [callSid]);
+
+    // Announce transfer
+    twiml.say({
+      voice: 'Polly.Joanna',
+      language: 'en-US'
+    }, 'Transferring you now. Please hold.');
+
+    // Dial subscriber's number
+    const dial = twiml.dial({
+      callerId: req.body.From, // Show caller's number to subscriber
+      timeout: 30,
+      action: '/api/voice-ai/transfer-status',
+      method: 'POST'
+    });
+
+    dial.number(forwardNumber);
+
+    res.type('text/xml');
+    res.send(twiml.toString());
+
+  } catch (error) {
+    console.error('❌ Error transferring call:', error);
+
+    const twiml = new VoiceResponse();
+    twiml.say('Sorry, unable to transfer your call. Please try again.');
+    twiml.hangup();
+
+    res.type('text/xml');
+    res.send(twiml.toString());
+  }
+});
+
+// ============================================================
+// ROUTE 9: Transfer Status Callback
+// Twilio webhook: POST /api/voice-ai/transfer-status
+// ============================================================
+
+router.post('/transfer-status', async (req, res) => {
+  try {
+    console.log('📊 Transfer status:', {
+      CallSid: req.body.CallSid,
+      DialCallStatus: req.body.DialCallStatus
+    });
+
+    const twiml = new VoiceResponse();
+    const dialStatus = req.body.DialCallStatus;
+
+    if (dialStatus === 'completed') {
+      // Call was answered, then ended normally
+      twiml.say({
+        voice: 'Polly.Joanna',
+        language: 'en-US'
+      }, 'Thank you for calling. Goodbye!');
+    } else if (dialStatus === 'no-answer' || dialStatus === 'busy') {
+      // No answer or busy
+      twiml.say({
+        voice: 'Polly.Joanna',
+        language: 'en-US'
+      }, 'Sorry, no one is available right now. Would you like to leave a message?');
+
+      const gather = twiml.gather({
+        input: 'speech dtmf',
+        action: '/api/voice-ai/voicemail',
+        method: 'POST',
+        timeout: 3,
+        numDigits: 1
+      });
+
+      gather.say({
+        voice: 'Polly.Joanna',
+        language: 'en-US'
+      }, 'Press 1 or say yes to leave a message.');
+
+      twiml.say({
+        voice: 'Polly.Joanna',
+        language: 'en-US'
+      }, 'No message recorded. Goodbye!');
+    } else {
+      // Other failure
+      twiml.say({
+        voice: 'Polly.Joanna',
+        language: 'en-US'
+      }, 'Unable to complete the transfer. Please try calling back later.');
+    }
+
+    twiml.hangup();
+
+    res.type('text/xml');
+    res.send(twiml.toString());
+
+  } catch (error) {
+    console.error('❌ Error in transfer status:', error);
+
+    const twiml = new VoiceResponse();
+    twiml.say('Thank you for calling. Goodbye!');
+    twiml.hangup();
+
+    res.type('text/xml');
+    res.send(twiml.toString());
+  }
+});
+
+// ============================================================
+// ROUTE 10: Voicemail Recording
+// Twilio webhook: POST /api/voice-ai/voicemail
+// ============================================================
+
+router.post('/voicemail', async (req, res) => {
+  try {
+    console.log('📧 Starting voicemail recording');
+
+    const twiml = new VoiceResponse();
+    const callSid = req.body.CallSid;
+
+    // Update call log
+    await req.db.query(`
+      UPDATE ai_voice_call_logs
+      SET call_outcome = 'voicemail_left'
+      WHERE call_sid = $1
+    `, [callSid]);
+
+    twiml.say({
+      voice: 'Polly.Joanna',
+      language: 'en-US'
+    }, 'Please leave your message after the beep. Press the pound key when finished.');
+
+    // Record message
+    twiml.record({
+      maxLength: 120, // 2 minutes max
+      finishOnKey: '#',
+      recordingStatusCallback: '/api/voice-ai/voicemail-callback',
+      recordingStatusCallbackMethod: 'POST',
+      transcribe: true,
+      transcribeCallback: '/api/voice-ai/voicemail-transcription'
+    });
+
+    twiml.say({
+      voice: 'Polly.Joanna',
+      language: 'en-US'
+    }, 'Thank you for your message. Goodbye!');
+
+    twiml.hangup();
+
+    res.type('text/xml');
+    res.send(twiml.toString());
+
+  } catch (error) {
+    console.error('❌ Error starting voicemail:', error);
+
+    const twiml = new VoiceResponse();
+    twiml.say('Sorry, unable to record message. Please call back.');
+    twiml.hangup();
+
+    res.type('text/xml');
+    res.send(twiml.toString());
+  }
+});
+
+// ============================================================
+// ROUTE 11: Voicemail Recording Callback
+// Twilio webhook: POST /api/voice-ai/voicemail-callback
+// ============================================================
+
+router.post('/voicemail-callback', async (req, res) => {
+  try {
+    console.log('📼 Voicemail recording completed:', {
+      CallSid: req.body.CallSid,
+      RecordingUrl: req.body.RecordingUrl,
+      RecordingDuration: req.body.RecordingDuration
+    });
+
+    const callSid = req.body.CallSid;
+    const recordingUrl = req.body.RecordingUrl;
+    const duration = req.body.RecordingDuration;
+
+    // Save recording URL to call log
+    await req.db.query(`
+      UPDATE ai_voice_call_logs
+      SET
+        call_recording_url = $1,
+        duration_seconds = $2
+      WHERE call_sid = $3
+    `, [recordingUrl, duration, callSid]);
+
+    res.status(200).send('OK');
+
+  } catch (error) {
+    console.error('❌ Error saving voicemail:', error);
+    res.status(200).send('OK');
+  }
+});
+
+// ============================================================
+// ROUTE 12: Voicemail Transcription Callback
+// Twilio webhook: POST /api/voice-ai/voicemail-transcription
+// ============================================================
+
+router.post('/voicemail-transcription', async (req, res) => {
+  try {
+    console.log('📝 Voicemail transcription received:', {
+      CallSid: req.body.CallSid,
+      TranscriptionText: req.body.TranscriptionText
+    });
+
+    const callSid = req.body.CallSid;
+    const transcriptionText = req.body.TranscriptionText;
+
+    // Save transcription
+    await req.db.query(`
+      UPDATE ai_voice_call_logs
+      SET conversation_transcript = COALESCE(conversation_transcript, '') || $1
+      WHERE call_sid = $2
+    `, [`\n\nVoicemail: ${transcriptionText}`, callSid]);
+
+    // Extract contact data from voicemail
+    const geminiService = require('../services/gemini');
+    const extractedData = await geminiService.extractContactData(transcriptionText);
+
+    // Update call log with extracted data
+    await req.db.query(`
+      UPDATE ai_voice_call_logs
+      SET extracted_data = $1
+      WHERE call_sid = $2
+    `, [JSON.stringify(extractedData), callSid]);
+
+    res.status(200).send('OK');
+
+  } catch (error) {
+    console.error('❌ Error processing transcription:', error);
+    res.status(200).send('OK');
   }
 });
 
