@@ -92,6 +92,44 @@ try {
 
   const PORT = process.env.PORT || 8080;
   console.log('Starting server on port', PORT);
+
+  // TEMPORARY: Migration endpoints (remove after use)
+  app.post('/admin/run-migration-006', async (req, res) => {
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const migrationPath = path.join(__dirname, 'migrations', '006_extend_knowledge_data.sql');
+      const migrationSQL = fs.readFileSync(migrationPath, 'utf8');
+      
+      const statements = migrationSQL.split(';').filter(stmt => stmt.trim().length > 0);
+      
+      for (const stmt of statements) {
+        if (stmt.trim()) {
+          await pool.query(stmt);
+        }
+      }
+      
+      res.json({ success: true, message: 'Migration 006 completed' });
+    } catch (error) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.post('/admin/run-migration-007', async (req, res) => {
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const migrationPath = path.join(__dirname, 'migrations', '007_add_language_to_call_logs.sql');
+      const migrationSQL = fs.readFileSync(migrationPath, 'utf8');
+      
+      await pool.query(migrationSQL);
+      
+      res.json({ success: true, message: 'Migration 007 completed' });
+    } catch (error) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   
   app.listen(PORT, '0.0.0.0', () => {
     console.log('✓✓✓ SERVER STARTED ✓✓✓');
@@ -110,36 +148,3 @@ try {
 // TEMPORARY: Migration endpoints (remove after use)
 app.post('/admin/run-migration-006', async (req, res) => {
   try {
-    const fs = require('fs');
-    const path = require('path');
-    const migrationPath = path.join(__dirname, 'migrations', '006_extend_knowledge_data.sql');
-    const migrationSQL = fs.readFileSync(migrationPath, 'utf8');
-    
-    const statements = migrationSQL.split(';').filter(stmt => stmt.trim().length > 0);
-    
-    for (const stmt of statements) {
-      if (stmt.trim()) {
-        await pool.query(stmt);
-      }
-    }
-    
-    res.json({ success: true, message: 'Migration 006 completed' });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-app.post('/admin/run-migration-007', async (req, res) => {
-  try {
-    const fs = require('fs');
-    const path = require('path');
-    const migrationPath = path.join(__dirname, 'migrations', '007_add_language_to_call_logs.sql');
-    const migrationSQL = fs.readFileSync(migrationPath, 'utf8');
-    
-    await pool.query(migrationSQL);
-    
-    res.json({ success: true, message: 'Migration 007 completed' });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
