@@ -5,7 +5,7 @@
 
 const express = require('express');
 const router = express.Router();
-const VoiceResponse = require('twilio').twiml.VoiceResponse;
+const twilio = require('twilio');
 const geminiService = require('../services/gemini');
 
 /**
@@ -32,7 +32,7 @@ async function checkTokenBalance(req, res, next) {
 
     // Require minimum 500 tokens (1 minute of call)
     if (token_balance < 500) {
-      const twiml = new VoiceResponse();
+      const twiml = new twilio.twiml.VoiceResponse();
       twiml.say({
         voice: 'Polly.Joanna',
         language: 'en-US'
@@ -71,7 +71,7 @@ router.post('/incoming', checkTokenBalance, async (req, res) => {
       CallStatus: req.body.CallStatus
     });
 
-    const twiml = new VoiceResponse();
+    const twiml = new twilio.twiml.VoiceResponse();
     const callSid = req.body.CallSid;
     const callerNumber = req.body.From;
     const twilioNumber = req.body.To;
@@ -137,7 +137,7 @@ router.post('/incoming', checkTokenBalance, async (req, res) => {
   } catch (error) {
     console.error('❌ Error handling incoming call:', error);
 
-    const twiml = new VoiceResponse();
+    const twiml = new twilio.twiml.VoiceResponse();
     twiml.say({
       voice: 'Polly.Joanna',
       language: 'en-US'
@@ -342,7 +342,7 @@ router.post('/process-response', async (req, res) => {
       Confidence: req.body.Confidence
     });
 
-    const twiml = new VoiceResponse();
+    const twiml = new twilio.twiml.VoiceResponse();
     const callSid = req.body.CallSid;
     const speechResult = req.body.SpeechResult || '';
     const twilioNumber = req.body.To;
@@ -414,7 +414,7 @@ router.post('/process-response', async (req, res) => {
   } catch (error) {
     console.error('❌ Error processing response:', error);
 
-    const twiml = new VoiceResponse();
+    const twiml = new twilio.twiml.VoiceResponse();
     twiml.say('An error occurred processing your request. Please try again.');
 
     res.type('text/xml');
@@ -434,7 +434,7 @@ router.post('/schedule-appointment', async (req, res) => {
       SpeechResult: req.body.SpeechResult
     });
 
-    const twiml = new VoiceResponse();
+    const twiml = new twilio.twiml.VoiceResponse();
     const callSid = req.body.CallSid;
     const speechResult = req.body.SpeechResult || '';
     const callerNumber = req.body.From;
@@ -486,7 +486,7 @@ router.post('/schedule-appointment', async (req, res) => {
   } catch (error) {
     console.error('❌ Error scheduling appointment:', error);
 
-    const twiml = new VoiceResponse();
+    const twiml = new twilio.twiml.VoiceResponse();
     twiml.say('Sorry, I had trouble scheduling that appointment. Please try again.');
 
     res.type('text/xml');
@@ -506,7 +506,7 @@ router.post('/collect-contact-info', async (req, res) => {
       SpeechResult: req.body.SpeechResult
     });
 
-    const twiml = new VoiceResponse();
+    const twiml = new twilio.twiml.VoiceResponse();
     const callSid = req.body.CallSid;
     const callerName = req.body.SpeechResult || 'Unknown';
     const callerNumber = req.body.From;
@@ -596,7 +596,7 @@ router.post('/collect-contact-info', async (req, res) => {
   } catch (error) {
     console.error('❌ Error collecting contact info:', error);
 
-    const twiml = new VoiceResponse();
+    const twiml = new twilio.twiml.VoiceResponse();
     twiml.say('Sorry, I had trouble saving your information. Please try again.');
 
     res.type('text/xml');
@@ -611,7 +611,7 @@ router.post('/collect-contact-info', async (req, res) => {
 
 router.post('/final-response', async (req, res) => {
   try {
-    const twiml = new VoiceResponse();
+    const twiml = new twilio.twiml.VoiceResponse();
     const speechResult = (req.body.SpeechResult || '').toLowerCase();
     const callSid = req.body.CallSid;
 
@@ -639,7 +639,7 @@ router.post('/final-response', async (req, res) => {
   } catch (error) {
     console.error('❌ Error in final response:', error);
 
-    const twiml = new VoiceResponse();
+    const twiml = new twilio.twiml.VoiceResponse();
     twiml.say('Thank you for calling. Goodbye!');
     twiml.hangup();
 
@@ -732,7 +732,7 @@ router.post('/gemini-response', async (req, res) => {
   try {
     console.log('🤖 Processing with Gemini AI');
 
-    const twiml = new VoiceResponse();
+    const twiml = new twilio.twiml.VoiceResponse();
     const callSid = req.body.CallSid;
     const twilioNumber = req.body.To;
 
@@ -833,7 +833,7 @@ router.post('/gemini-response', async (req, res) => {
   } catch (error) {
     console.error('❌ Error in Gemini response:', error);
 
-    const twiml = new VoiceResponse();
+    const twiml = new twilio.twiml.VoiceResponse();
     twiml.say('Sorry, I had trouble processing that. Please try again.');
 
     res.type('text/xml');
@@ -850,7 +850,7 @@ router.post('/transfer-to-human', async (req, res) => {
   try {
     console.log('📲 Transferring call to human');
 
-    const twiml = new VoiceResponse();
+    const twiml = new twilio.twiml.VoiceResponse();
     const callSid = req.body.CallSid;
     const twilioNumber = req.body.To;
 
@@ -908,7 +908,7 @@ router.post('/transfer-to-human', async (req, res) => {
   } catch (error) {
     console.error('❌ Error transferring call:', error);
 
-    const twiml = new VoiceResponse();
+    const twiml = new twilio.twiml.VoiceResponse();
     twiml.say('Sorry, unable to transfer your call. Please try again.');
     twiml.hangup();
 
@@ -929,7 +929,7 @@ router.post('/transfer-status', async (req, res) => {
       DialCallStatus: req.body.DialCallStatus
     });
 
-    const twiml = new VoiceResponse();
+    const twiml = new twilio.twiml.VoiceResponse();
     const dialStatus = req.body.DialCallStatus;
 
     if (dialStatus === 'completed') {
@@ -978,7 +978,7 @@ router.post('/transfer-status', async (req, res) => {
   } catch (error) {
     console.error('❌ Error in transfer status:', error);
 
-    const twiml = new VoiceResponse();
+    const twiml = new twilio.twiml.VoiceResponse();
     twiml.say('Thank you for calling. Goodbye!');
     twiml.hangup();
 
@@ -996,7 +996,7 @@ router.post('/voicemail', async (req, res) => {
   try {
     console.log('📧 Starting voicemail recording');
 
-    const twiml = new VoiceResponse();
+    const twiml = new twilio.twiml.VoiceResponse();
     const callSid = req.body.CallSid;
 
     // Update call log
@@ -1034,7 +1034,7 @@ router.post('/voicemail', async (req, res) => {
   } catch (error) {
     console.error('❌ Error starting voicemail:', error);
 
-    const twiml = new VoiceResponse();
+    const twiml = new twilio.twiml.VoiceResponse();
     twiml.say('Sorry, unable to record message. Please call back.');
     twiml.hangup();
 
