@@ -82,11 +82,11 @@ function getBrandVoicePrompt(knowledgeData, language = 'en') {
  */
 function getLanguageMenuPrompt(knowledgeData) {
   const menuEn = knowledgeData.language_preferences?.menu_prompt?.en
-    || "Press 1 for English or 2 for Spanish.";
+    || "Press 1 for English";
   const menuEs = knowledgeData.language_preferences?.menu_prompt?.es
-    || "Presiona 1 para inglés o 2 para español.";
+    || "Presiona 2 para español";
 
-  return `${menuEn} ${menuEs}`;
+  return `${menuEn}, ${menuEs}.`;
 }
 
 /**
@@ -98,7 +98,11 @@ function getLanguageMenuPrompt(knowledgeData) {
 function interpolateVariables(template, data) {
   return template.replace(/\{(\w+)\}/g, (match, key) => {
     if (key === 'target_industries' && Array.isArray(data.target_industries)) {
-      return data.target_industries.join(', ');
+      // Replace underscores with spaces and format nicely
+      const formatted = data.target_industries.map(industry => 
+        industry.replace(/_/g, ' ')
+      ).join(', ');
+      return formatted;
     }
     return data[key] || match;
   });

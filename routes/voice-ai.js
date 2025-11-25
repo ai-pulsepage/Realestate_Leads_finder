@@ -312,6 +312,11 @@ router.post('/language-selected', async (req, res) => {
       connect.stream({
         url: `wss://${req.get('host')}/api/voice-ai/media-stream?language=${selectedLanguage}&userId=${userId}`
       });
+      twiml.redirect(`/api/voice-ai/incoming?language=${selectedLanguage}&userId=${userId}`);
+      const connect = twiml.connect();
+      connect.stream({
+        url: `wss://${req.get('host')}/api/voice-ai/media-stream?language=${selectedLanguage}&userId=${userId}`
+      });
 
       console.log('✅ Connecting to media stream with language:', selectedLanguage);
       res.type('text/xml').send(twiml.toString());
