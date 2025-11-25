@@ -171,7 +171,7 @@ router.post('/language-menu', async (req, res) => {
     // PostgreSQL: Direct pool query
     try {
       const profileResult = await req.pool.query(
-        'SELECT user_id FROM subscriber_profiles WHERE twilio_phone_number = $1',
+        'SELECT user_id FROM users WHERE twilio_phone_number = $1',
         [subscriberNumber]
       );
 
@@ -272,7 +272,7 @@ router.post('/language-selected', async (req, res) => {
     // PostgreSQL: Direct pool query
     try {
       const profileResult = await req.pool.query(
-        'SELECT user_id FROM subscriber_profiles WHERE twilio_phone_number = $1',
+        'SELECT user_id FROM users WHERE twilio_phone_number = $1',
         [subscriberNumber]
       );
 
