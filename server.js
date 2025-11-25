@@ -13,6 +13,8 @@ try {
 
   const app = express();
   app.use(express.json());
+  app.use(express.urlencoded({ extended: true }));
+  app.use(express.urlencoded({ extended: true }));
 
   app.get('/', (req, res) => {
     res.json({ status: 'ok', service: 'Real Estate Leads API', version: '1.0.0' });

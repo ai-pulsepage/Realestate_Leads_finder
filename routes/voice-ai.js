@@ -19,7 +19,7 @@ async function checkTokenBalance(req, res, next) {
       return next();
     }
 
-    const balanceQuery = await req.db.query(`
+    const balanceQuery = await req.pool.query(`
       SELECT sp.token_balance, u.user_id
       FROM users u
       JOIN subscriber_profiles sp ON u.user_id = sp.user_id
@@ -79,7 +79,7 @@ router.post('/incoming', checkTokenBalance, async (req, res) => {
     const twilioNumber = req.body.To;
 
     // Find which subscriber owns this Twilio number
-    const subscriberQuery = await req.db.query(
+    const subscriberQuery = await req.pool.query(
       'SELECT user_id, email FROM users WHERE twilio_phone_number = $1 AND voice_ai_enabled = true',
       [twilioNumber]
     );
@@ -99,7 +99,7 @@ router.post('/incoming', checkTokenBalance, async (req, res) => {
     const userId = subscriber.user_id;
 
     // Check token balance
-    const balanceQuery = await req.db.query(
+    const balanceQuery = await req.pool.query(
       'SELECT token_balance FROM subscriber_profiles WHERE user_id = $1',
       [userId]
     );
@@ -116,7 +116,7 @@ router.post('/incoming', checkTokenBalance, async (req, res) => {
     }
 
     // Log the incoming call
-    await req.db.query(`
+    await req.pool.query(`
       INSERT INTO ai_voice_call_logs (
         user_id, call_sid, call_type, direction,
         caller_number, twilio_number, call_status
@@ -124,7 +124,7 @@ router.post('/incoming', checkTokenBalance, async (req, res) => {
     `, [userId, callSid, callerNumber, twilioNumber]);
 
     // Load subscriber's knowledge base
-    const knowledgeQuery = await req.db.query(
+    const knowledgeQuery = await req.pool.query(
       'SELECT knowledge_data FROM subscriber_knowledge_base WHERE user_id = $1',
       [userId]
     );
@@ -199,7 +199,7 @@ router.post('/process-response', async (req, res) => {
     const twilioNumber = req.body.To;
 
     // Get subscriber info
-    const subscriberQuery = await req.db.query(
+    const subscriberQuery = await req.pool.query(
       'SELECT user_id FROM users WHERE twilio_phone_number = $1',
       [twilioNumber]
     );
@@ -213,7 +213,7 @@ router.post('/process-response', async (req, res) => {
     const userId = subscriberQuery.rows[0].user_id;
 
     // Update call log with speech transcript
-    await req.db.query(`
+    await req.pool.query(`
       UPDATE ai_voice_call_logs
       SET conversation_transcript = COALESCE(conversation_transcript, '') || $1 || '\n'
       WHERE call_sid = $2
@@ -292,7 +292,7 @@ router.post('/schedule-appointment', async (req, res) => {
     const twilioNumber = req.body.To;
 
     // Get subscriber
-    const subscriberQuery = await req.db.query(
+    const subscriberQuery = await req.pool.query(
       'SELECT user_id FROM users WHERE twilio_phone_number = $1',
       [twilioNumber]
     );
@@ -300,7 +300,7 @@ router.post('/schedule-appointment', async (req, res) => {
     const userId = subscriberQuery.rows[0].user_id;
 
     // Update transcript
-    await req.db.query(`
+    await req.pool.query(`
       UPDATE ai_voice_call_logs
       SET conversation_transcript = COALESCE(conversation_transcript, '') || $1 || '\n'
       WHERE call_sid = $2
@@ -364,7 +364,7 @@ router.post('/collect-contact-info', async (req, res) => {
     const twilioNumber = req.body.To;
 
     // Get subscriber
-    const subscriberQuery = await req.db.query(
+    const subscriberQuery = await req.pool.query(
       'SELECT user_id FROM users WHERE twilio_phone_number = $1',
       [twilioNumber]
     );
@@ -372,7 +372,7 @@ router.post('/collect-contact-info', async (req, res) => {
     const userId = subscriberQuery.rows[0].user_id;
 
     // Update transcript
-    await req.db.query(`
+    await req.pool.query(`
       UPDATE ai_voice_call_logs
       SET conversation_transcript = COALESCE(conversation_transcript, '') || $1 || '\n'
       WHERE call_sid = $2
@@ -382,7 +382,7 @@ router.post('/collect-contact-info', async (req, res) => {
     const appointmentTime = new Date();
     appointmentTime.setHours(appointmentTime.getHours() + 24);
 
-    const appointmentResult = await req.db.query(`
+    const appointmentResult = await req.pool.query(`
       INSERT INTO appointments (
         user_id, contact_name, contact_phone,
         appointment_datetime, appointment_type,
@@ -400,7 +400,7 @@ router.post('/collect-contact-info', async (req, res) => {
     ]);
 
     // Update call log with outcome
-    await req.db.query(`
+    await req.pool.query(`
       UPDATE ai_voice_call_logs
       SET
         call_outcome = 'appointment_scheduled',
@@ -517,7 +517,7 @@ router.post('/status-callback', async (req, res) => {
     const callDuration = parseInt(req.body.CallDuration || '0');
 
     // Update call log
-    await req.db.query(`
+    await req.pool.query(`
       UPDATE ai_voice_call_logs
       SET
         call_status = $1,
@@ -532,7 +532,7 @@ router.post('/status-callback', async (req, res) => {
       const tokensUsed = minutes * 500;
 
       // Get user_id from call log
-      const callLogQuery = await req.db.query(
+      const callLogQuery = await req.pool.query(
         'SELECT user_id FROM ai_voice_call_logs WHERE call_sid = $1',
         [callSid]
       );
@@ -541,14 +541,14 @@ router.post('/status-callback', async (req, res) => {
         const userId = callLogQuery.rows[0].user_id;
 
         // Deduct tokens
-        await req.db.query(`
+        await req.pool.query(`
           UPDATE subscriber_profiles
           SET token_balance = token_balance - $1
           WHERE user_id = $2
         `, [tokensUsed, userId]);
 
         // Log token usage
-        await req.db.query(`
+        await req.pool.query(`
           INSERT INTO token_usage_log (
             user_id, action_type, tokens_used,
             reference_id, reference_type
@@ -556,7 +556,7 @@ router.post('/status-callback', async (req, res) => {
         `, [userId, tokensUsed, callSid]);
 
         // Update call log with token cost
-        await req.db.query(`
+        await req.pool.query(`
           UPDATE ai_voice_call_logs
           SET tokens_used = $1
           WHERE call_sid = $2
@@ -588,7 +588,7 @@ router.post('/gemini-response', async (req, res) => {
     const twilioNumber = req.body.To;
 
     // Get subscriber and conversation history
-    const subscriberQuery = await req.db.query(`
+    const subscriberQuery = await req.pool.query(`
       SELECT u.user_id, skb.knowledge_data
       FROM users u
       LEFT JOIN subscriber_knowledge_base skb ON u.user_id = skb.user_id
@@ -605,7 +605,7 @@ router.post('/gemini-response', async (req, res) => {
     const knowledgeBase = subscriberQuery.rows[0].knowledge_data || {};
 
     // Get conversation history
-    const historyQuery = await req.db.query(
+    const historyQuery = await req.pool.query(
       'SELECT conversation_transcript FROM ai_voice_call_logs WHERE call_sid = $1',
       [callSid]
     );
@@ -628,7 +628,7 @@ router.post('/gemini-response', async (req, res) => {
     });
 
     // Update transcript with AI response
-    await req.db.query(`
+    await req.pool.query(`
       UPDATE ai_voice_call_logs
       SET conversation_transcript = COALESCE(conversation_transcript, '') || $1 || '\n'
       WHERE call_sid = $2
@@ -706,7 +706,7 @@ router.post('/transfer-to-human', async (req, res) => {
     const twilioNumber = req.body.To;
 
     // Get subscriber's phone number
-    const subscriberQuery = await req.db.query(`
+    const subscriberQuery = await req.pool.query(`
       SELECT u.user_id, u.email, skb.knowledge_data
       FROM users u
       LEFT JOIN subscriber_knowledge_base skb ON u.user_id = skb.user_id
@@ -731,7 +731,7 @@ router.post('/transfer-to-human', async (req, res) => {
     }
 
     // Update call log
-    await req.db.query(`
+    await req.pool.query(`
       UPDATE ai_voice_call_logs
       SET call_outcome = 'transferred_to_human'
       WHERE call_sid = $1
@@ -851,7 +851,7 @@ router.post('/voicemail', async (req, res) => {
     const callSid = req.body.CallSid;
 
     // Update call log
-    await req.db.query(`
+    await req.pool.query(`
       UPDATE ai_voice_call_logs
       SET call_outcome = 'voicemail_left'
       WHERE call_sid = $1
@@ -912,7 +912,7 @@ router.post('/voicemail-callback', async (req, res) => {
     const duration = req.body.RecordingDuration;
 
     // Save recording URL to call log
-    await req.db.query(`
+    await req.pool.query(`
       UPDATE ai_voice_call_logs
       SET
         call_recording_url = $1,
@@ -944,7 +944,7 @@ router.post('/voicemail-transcription', async (req, res) => {
     const transcriptionText = req.body.TranscriptionText;
 
     // Save transcription
-    await req.db.query(`
+    await req.pool.query(`
       UPDATE ai_voice_call_logs
       SET conversation_transcript = COALESCE(conversation_transcript, '') || $1
       WHERE call_sid = $2
@@ -955,7 +955,7 @@ router.post('/voicemail-transcription', async (req, res) => {
     const extractedData = await geminiService.extractContactData(transcriptionText);
 
     // Update call log with extracted data
-    await req.db.query(`
+    await req.pool.query(`
       UPDATE ai_voice_call_logs
       SET extracted_data = $1
       WHERE call_sid = $2
