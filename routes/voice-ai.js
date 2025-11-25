@@ -168,14 +168,14 @@ router.post('/language-menu', async (req, res) => {
     const subscriberNumber = To;
 
     // Look up subscriber by phone number
-    const connection = await req.pool.getConnection();
+    // PostgreSQL: Direct pool query
     try {
-      const [profiles] = await connection.query(
+      const profileResult = await req.pool.query(
         'SELECT user_id FROM subscriber_profiles WHERE twilio_phone_number = ?',
         [subscriberNumber]
       );
 
-      if (profiles.length === 0) {
+      if (profileResult.rows.length === 0) {
         console.error('❌ No subscriber found for number:', subscriberNumber);
         const twiml = new twilio.twiml.VoiceResponse();
         twiml.say('We\'re sorry, but this number is not configured. Please contact support.');
@@ -183,15 +183,15 @@ router.post('/language-menu', async (req, res) => {
         return res.type('text/xml').send(twiml.toString());
       }
 
-      const userId = profiles[0].user_id;
+      const userId = profileResult.rows[0].user_id;
 
       // Load knowledge data
-      const [knowledge] = await connection.query(
+      const knowledgeResult = await req.pool.query(
         'SELECT knowledge_data FROM subscriber_knowledge_base WHERE user_id = ?',
         [userId]
       );
 
-      if (knowledge.length === 0) {
+      if (knowledgeResult.rows.length === 0) {
         console.error('❌ No knowledge data found for user:', userId);
         const twiml = new twilio.twiml.VoiceResponse();
         twiml.say('We\'re sorry, but the system is not configured. Please contact support.');
@@ -199,7 +199,7 @@ router.post('/language-menu', async (req, res) => {
         return res.type('text/xml').send(twiml.toString());
       }
 
-      const knowledgeData = knowledge[0].knowledge_data;
+      const knowledgeData = knowledgeResult.rows[0].knowledge_data;
 
       // Import utility functions
       const { getLanguageMenuPrompt } = require('../utils/voice-customization');
@@ -228,7 +228,7 @@ router.post('/language-menu', async (req, res) => {
       res.type('text/xml').send(twiml.toString());
 
     } finally {
-      connection.release();
+      
     }
 
   } catch (error) {
@@ -269,14 +269,14 @@ router.post('/language-selected', async (req, res) => {
     const subscriberNumber = To;
 
     // Look up subscriber
-    const connection = await req.pool.getConnection();
+    // PostgreSQL: Direct pool query
     try {
-      const [profiles] = await connection.query(
+      const profileResult = await req.pool.query(
         'SELECT user_id FROM subscriber_profiles WHERE twilio_phone_number = ?',
         [subscriberNumber]
       );
 
-      if (profiles.length === 0) {
+      if (profileResult.rows.length === 0) {
         console.error('❌ No subscriber found for number:', subscriberNumber);
         const twiml = new twilio.twiml.VoiceResponse();
         twiml.say('We\'re sorry, but this number is not configured.');
@@ -284,15 +284,15 @@ router.post('/language-selected', async (req, res) => {
         return res.type('text/xml').send(twiml.toString());
       }
 
-      const userId = profiles[0].user_id;
+      const userId = profileResult.rows[0].user_id;
 
       // Load knowledge data
-      const [knowledge] = await connection.query(
+      const knowledgeResult = await req.pool.query(
         'SELECT knowledge_data FROM subscriber_knowledge_base WHERE user_id = ?',
         [userId]
       );
 
-      const knowledgeData = knowledge[0].knowledge_data;
+      const knowledgeData = knowledgeResult.rows[0].knowledge_data;
 
       // Import utility functions
       const { getCustomGreeting } = require('../utils/voice-customization');
@@ -317,7 +317,7 @@ router.post('/language-selected', async (req, res) => {
       res.type('text/xml').send(twiml.toString());
 
     } finally {
-      connection.release();
+      
     }
 
   } catch (error) {
@@ -1136,22 +1136,22 @@ router.post('/media-stream', (req, res) => {
   res.on('upgrade', async (request, socket, head) => {
     try {
       // Load knowledge data for this user
-      const connection = await req.pool.getConnection();
+      // PostgreSQL: Direct pool query
       let knowledgeData;
 
       try {
-        const [knowledge] = await connection.query(
+        const knowledgeResult = await req.pool.query(
           'SELECT knowledge_data FROM subscriber_knowledge_base WHERE user_id = ?',
           [userId]
         );
 
-        if (knowledge.length === 0) {
+        if (knowledgeResult.rows.length === 0) {
           throw new Error('No knowledge data found for user');
         }
 
-        knowledgeData = knowledge[0].knowledge_data;
+        knowledgeData = knowledgeResult.rows[0].knowledge_data;
       } finally {
-        connection.release();
+        
       }
 
       // Import utility functions
