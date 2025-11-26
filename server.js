@@ -1,6 +1,12 @@
+require('dotenv').config({
+  path: process.env.NODE_ENV === 'production' ? '.env.production' : '.env'
+});
+
 console.log('=== SERVER STARTUP ===');
 console.log('Node:', process.version);
 console.log('PORT:', process.env.PORT);
+console.log('Environment:', process.env.NODE_ENV || 'development');
+console.log('DATABASE_URL set:', process.env.DATABASE_URL ? 'Yes' : 'No');
 
 try {
   console.log('Loading express...');
