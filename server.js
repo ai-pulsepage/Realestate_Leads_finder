@@ -200,19 +200,15 @@ Guidelines:
 
       const model = "gemini-2.0-flash-exp";
       const generationConfig = {
-        response_modalities: ["AUDIO"],
-        speech_config: {
-          voice_config: {
-            prebuilt_voice_config: {
-              voice_name: "Kore"
+        responseModalities: ["audio"],
+        speechConfig: {
+          voiceConfig: {
+            prebuiltVoiceConfig: {
+              voiceName: "Kore"
             }
           }
         },
-        system_instruction: {
-          parts: [{
-            text: systemInstruction
-          }]
-        }
+        systemInstruction: systemInstruction
       };
 
       console.log('🎙️ Connecting to Gemini Live session...');
