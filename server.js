@@ -232,17 +232,9 @@ Guidelines:
           if (message.data) {
             console.log('🔊 Gemini audio response received, size:', message.data.length);
 
-            // Convert 16-bit PCM back to 8-bit PCM, then to MULAW for Twilio
+            // Convert 16-bit PCM to MULAW for Twilio
             const pcm16Buffer = Buffer.from(message.data, 'base64');
-            const pcm8Buffer = Buffer.alloc(pcm16Buffer.length / 2);
-
-            for (let i = 0; i < pcm8Buffer.length; i++) {
-              const sample = pcm16Buffer.readInt16LE(i * 2) / 256; // Scale down from 16-bit
-              pcm8Buffer[i] = Math.max(0, Math.min(255, sample + 128)); // Convert to unsigned 8-bit
-            }
-
-            // Convert PCM to MULAW for Twilio
-            const mulawAudioData = g711.ulawFromPCM(pcm8Buffer);
+            const mulawAudioData = g711.ulawFromPCM(pcm16Buffer);
             console.log('🔊 Converted to MULAW buffer size:', mulawAudioData.length);
 
             // Send audio back to Twilio
@@ -334,13 +326,7 @@ Guidelines:
                 console.log('🎵 Received MULAW buffer, size:', mulawBuffer.length);
 
                 // Convert MULAW to 16-bit PCM for Gemini (16kHz expected)
-                const pcmBuffer = g711.ulawToPCM(mulawBuffer);
-                // Convert 8-bit PCM to 16-bit PCM (Twilio sends 8-bit, Gemini expects 16-bit)
-                const pcm16Buffer = Buffer.alloc(pcmBuffer.length * 2);
-                for (let i = 0; i < pcmBuffer.length; i++) {
-                  const sample = pcmBuffer[i] - 128; // Convert unsigned 8-bit to signed
-                  pcm16Buffer.writeInt16LE(sample * 256, i * 2); // Scale to 16-bit
-                }
+                const pcm16Buffer = g711.ulawToPCM(mulawBuffer);
                 console.log('🎵 Converted to 16-bit PCM buffer, size:', pcm16Buffer.length);
 
                 // Send audio to Gemini Live API
