@@ -44,6 +44,7 @@ try {
         health.database = 'connected';
       } catch (err) {
         health.database = 'error';
+        // Don't change status to unhealthy - app can still serve requests without DB
       }
     }
     res.json(health);
