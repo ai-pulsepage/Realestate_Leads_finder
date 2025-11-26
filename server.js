@@ -169,7 +169,7 @@ try {
 
     try {
       // Load Gemini Live API and audio conversion
-      const { GoogleGenAI } = require('@google/genai');
+      const { GoogleGenAI, Modality } = require('@google/genai');
       const g711 = require('g711');
       const client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
@@ -216,8 +216,8 @@ Guidelines:
 - Emphasize urgency and next steps for conversions`;
 
       const model = "gemini-2.5-flash-native-audio-preview-09-2025";
-      const generationConfig = {
-        responseModalities: ["audio"],
+      const config = {
+        responseModalities: [Modality.AUDIO],
         speechConfig: {
           voiceConfig: {
             prebuiltVoiceConfig: {
@@ -232,23 +232,12 @@ Guidelines:
       try {
         session = await client.live.connect({
           model: model,
-          generationConfig: generationConfig
-        });
-
-        console.log('✅ Gemini Live session connected successfully');
-
-        // Send initial context message to establish conversation
-        session.sendClientContent({
-          turns: [{
-            role: 'user',
-            parts: [{ text: 'Hello, I am calling about real estate services. Please respond naturally and help me with my real estate needs.' }]
-          }],
-          turnComplete: true
-        });
-        console.log('📝 Initial context message sent to Gemini');
-
-        // Set up Gemini response handlers
-        session.onmessage = (message) => {
+          config: config,
+          callbacks: {
+            onopen: () => {
+              console.log('✅ Gemini Live session connected successfully');
+            },
+            onmessage: (message) => {
         try {
           console.log('🎤 Gemini response received');
 
@@ -320,15 +309,26 @@ Guidelines:
         } catch (error) {
           console.error('❌ Error processing Gemini response:', error);
         }
-      };
+      },
+            onerror: (error) => {
+              console.error('❌ Gemini session error:', error);
+            },
+            onclose: () => {
+              console.log('✅ Gemini session closed');
+            }
+          }
+        });
 
-      session.onerror = (error) => {
-        console.error('❌ Gemini session error:', error);
-      };
-
-      session.onclose = () => {
-        console.log('✅ Gemini session closed');
-      };
+        console.log('📝 Sending initial context message to Gemini...');
+        // Send initial context message to establish conversation
+        session.sendClientContent({
+          turns: [{
+            role: 'user',
+            parts: [{ text: 'Hello, I am calling about real estate services. Please respond naturally and help me with my real estate needs.' }]
+          }],
+          turnComplete: true
+        });
+        console.log('📝 Initial context message sent to Gemini');
 
         // Send acknowledgment
         ws.send(JSON.stringify({
@@ -369,14 +369,26 @@ Guidelines:
                 const mulawBuffer = Buffer.from(data.media.payload, 'base64');
                 console.log('🎵 Received MULAW buffer, size:', mulawBuffer.length);
 
-                // Convert MULAW to 16-bit PCM for Gemini (16kHz expected)
-                const pcm16Buffer = g711.ulawToPCM(mulawBuffer);
-                console.log('🎵 Converted to 16-bit PCM buffer, size:', pcm16Buffer.length);
+                // Convert MULAW to 16-bit PCM (8kHz)
+                const pcm8kBuffer = g711.ulawToPCM(mulawBuffer);
+                console.log('🎵 Converted MULAW to 16-bit PCM (8kHz), size:', pcm8kBuffer.length);
+
+                // Upsample from 8kHz to 16kHz PCM for Gemini
+                // Simple linear interpolation: duplicate each sample
+                const pcm16kBuffer = Buffer.alloc(pcm8kBuffer.length * 2);
+                for (let i = 0, j = 0; i < pcm8kBuffer.length; i += 2, j += 4) {
+                  // Copy each 16-bit sample and duplicate it
+                  pcm16kBuffer[j] = pcm8kBuffer[i];
+                  pcm16kBuffer[j + 1] = pcm8kBuffer[i + 1];
+                  pcm16kBuffer[j + 2] = pcm8kBuffer[i];
+                  pcm16kBuffer[j + 3] = pcm8kBuffer[i + 1];
+                }
+                console.log('🎵 Upsampled to 16-bit PCM (16kHz), size:', pcm16kBuffer.length);
 
                 // Send audio to Gemini Live API
                 session.sendRealtimeInput({
                   audio: {
-                    data: pcm16Buffer.toString('base64'),
+                    data: pcm16kBuffer.toString('base64'),
                     mimeType: "audio/pcm;rate=16000"
                   }
                 });
