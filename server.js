@@ -242,7 +242,7 @@ Guidelines:
             }
 
             // Convert PCM to MULAW for Twilio
-            const mulawAudioData = g711.encode(pcm8Buffer);
+            const mulawAudioData = g711.ulawFromPCM(pcm8Buffer);
             console.log('🔊 Converted to MULAW buffer size:', mulawAudioData.length);
 
             // Send audio back to Twilio
@@ -334,7 +334,7 @@ Guidelines:
                 console.log('🎵 Received MULAW buffer, size:', mulawBuffer.length);
 
                 // Convert MULAW to 16-bit PCM for Gemini (16kHz expected)
-                const pcmBuffer = g711.decode(mulawBuffer);
+                const pcmBuffer = g711.ulawToPCM(mulawBuffer);
                 // Convert 8-bit PCM to 16-bit PCM (Twilio sends 8-bit, Gemini expects 16-bit)
                 const pcm16Buffer = Buffer.alloc(pcmBuffer.length * 2);
                 for (let i = 0; i < pcmBuffer.length; i++) {
