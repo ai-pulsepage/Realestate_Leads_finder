@@ -155,9 +155,33 @@ try {
       const textToSpeech = require('@google-cloud/text-to-speech');
       const { generateChatResponse } = require('./api/togetherAi');
 
-      // Initialize Google Cloud clients
-      const speechClient = new speech.SpeechClient();
-      const ttsClient = new textToSpeech.TextToSpeechClient();
+      // Initialize Google Cloud clients with error handling
+      let speechClient, ttsClient;
+      try {
+        speechClient = new speech.SpeechClient();
+        console.log('✅ Speech client initialized');
+      } catch (error) {
+        console.error('❌ Failed to initialize Speech client:', error);
+        ws.send(JSON.stringify({
+          event: 'error',
+          message: 'Speech service unavailable'
+        }));
+        ws.close();
+        return;
+      }
+
+      try {
+        ttsClient = new textToSpeech.TextToSpeechClient();
+        console.log('✅ Text-to-Speech client initialized');
+      } catch (error) {
+        console.error('❌ Failed to initialize Text-to-Speech client:', error);
+        ws.send(JSON.stringify({
+          event: 'error',
+          message: 'Text-to-speech service unavailable'
+        }));
+        ws.close();
+        return;
+      }
 
       // Extract query parameters from WebSocket URL
       const parsedUrl = url.parse(request.url, true);
@@ -228,11 +252,27 @@ try {
             }));
 
             // Start speech recognition
-            recognizeStream = speechClient.streamingRecognize(requestConfig)
-              .on('error', (error) => {
-                console.error('❌ Speech recognition error:', error);
-              })
-              .on('data', async (data) => {
+            try {
+              recognizeStream = speechClient.streamingRecognize(requestConfig)
+                .on('error', (error) => {
+                  console.error('❌ Speech recognition error:', error);
+                  // Send error message to client
+                  ws.send(JSON.stringify({
+                    event: 'error',
+                    message: 'Speech recognition failed: ' + error.message
+                  }));
+                })
+            } catch (error) {
+              console.error('❌ Failed to start speech recognition:', error);
+              ws.send(JSON.stringify({
+                event: 'error',
+                message: 'Failed to start speech recognition'
+              }));
+              ws.close();
+              return;
+            }
+
+            recognizeStream.on('data', async (data) => {
                 if (data.results[0] && data.results[0].alternatives[0]) {
                   const transcript = data.results[0].alternatives[0].transcript;
                   console.log(`🎤 Speech recognized: "${transcript}"`);
