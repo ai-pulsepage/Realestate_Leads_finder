@@ -1212,11 +1212,14 @@ function generateErrorAudio(message) {
 router.all('/media-stream', (req, res) => {
   console.log('🎙️ Media stream connection requested');
 
-  // Extract query parameters
-  const language = req.query.language || 'en';
-  const userId = req.query.userId;
+  // Extract query parameters from URL
+  const url = require('url');
+  const queryParams = url.parse(req.url, true).query;
+  const language = queryParams.language || 'en';
+  const userId = queryParams.userId;
+  const callSid = queryParams.callSid;
 
-  console.log(`Language: ${language}, User ID: ${userId}`);
+  console.log(`Language: ${language}, User ID: ${userId}, Call SID: ${callSid}`);
 
   // WebSocket upgrade handler
   res.on('upgrade', async (request, socket, head) => {
