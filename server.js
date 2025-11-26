@@ -198,7 +198,7 @@ Guidelines:
 - Provide specific, actionable advice for home-related services
 - Emphasize urgency and next steps for conversions`;
 
-      const model = "gemini-2.5-flash-native-audio-preview-09-2025";
+      const model = "gemini-2.0-flash-exp";
       const generationConfig = {
         response_modalities: ["AUDIO"],
         speech_config: {
