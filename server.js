@@ -198,16 +198,16 @@ Guidelines:
 - Provide specific, actionable advice for home-related services
 - Emphasize urgency and next steps for conversions`;
 
-      const model = "gemini-2.5-flash-native-audio-preview-09-2025";
-      const config = {
-        responseModalities: ["AUDIO"],
+      const model = "gemini-2.0-flash-exp";
+      const generationConfig = {
+        responseModalities: ["text", "audio"],
         systemInstruction: systemInstruction
       };
 
       console.log('🎙️ Connecting to Gemini Live session...');
       const session = await client.live.connect({
         model: model,
-        config: config
+        generationConfig: generationConfig
       });
 
       console.log('✅ Gemini Live session connected successfully');
