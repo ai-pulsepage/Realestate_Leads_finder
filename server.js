@@ -200,7 +200,7 @@ Guidelines:
 
       const model = "gemini-2.0-flash-exp";
       const generationConfig = {
-        responseModalities: ["text", "audio"],
+        responseModalities: ["audio"],
         systemInstruction: systemInstruction
       };
 
