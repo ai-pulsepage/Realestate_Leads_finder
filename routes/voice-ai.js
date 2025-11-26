@@ -1209,7 +1209,7 @@ function generateErrorAudio(message) {
 // Twilio webhook: POST /api/voice-ai/media-stream
 // ============================================================
 
-router.post('/media-stream', (req, res) => {
+router.all('/media-stream', (req, res) => {
   console.log('🎙️ Media stream connection requested');
 
   // Extract query parameters
