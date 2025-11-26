@@ -1212,18 +1212,26 @@ function generateErrorAudio(message) {
 router.all('/media-stream', (req, res) => {
   console.log('🎙️ Media stream connection requested');
 
-  // Extract query parameters from URL
-  const url = require('url');
-  const queryParams = url.parse(req.url, true).query;
-  const language = queryParams.language || 'en';
-  const userId = queryParams.userId;
-  const callSid = queryParams.callSid;
-
-  console.log(`Language: ${language}, User ID: ${userId}, Call SID: ${callSid}`);
-
   // WebSocket upgrade handler
   res.on('upgrade', async (request, socket, head) => {
     try {
+
+      // Extract query parameters from WebSocket upgrade request URL
+      const url = require('url');
+      const parsedUrl = url.parse(request.url, true);
+      const queryParams = parsedUrl.query;
+      const language = queryParams.language || 'en';
+      const userId = queryParams.userId;
+      const callSid = queryParams.callSid;
+
+      console.log(`✅ WebSocket params - Language: ${language}, User ID: ${userId}, Call SID: ${callSid}`);
+
+      if (!userId) {
+        console.error('❌ No userId provided');
+        socket.destroy();
+        return;
+      }
+      
       // Load knowledge data for this user
       // PostgreSQL: Direct pool query
       let knowledgeData;
