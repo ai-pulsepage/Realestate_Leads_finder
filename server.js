@@ -234,6 +234,16 @@ Guidelines:
 
       console.log('✅ Gemini Live session connected successfully');
 
+      // Send initial context message to establish conversation
+      session.sendClientContent({
+        turns: [{
+          role: 'user',
+          parts: [{ text: 'Hello, I am calling about real estate services. Please respond naturally and help me with my real estate needs.' }]
+        }],
+        turnComplete: true
+      });
+      console.log('📝 Initial context message sent to Gemini');
+
       // Set up Gemini response handlers
       session.onmessage = (message) => {
         try {
