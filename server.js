@@ -227,25 +227,26 @@ Guidelines:
       };
 
       console.log('🎙️ Connecting to Gemini Live session...');
-      const session = await client.live.connect({
-        model: model,
-        generationConfig: generationConfig
-      });
+      try {
+        const session = await client.live.connect({
+          model: model,
+          generationConfig: generationConfig
+        });
 
-      console.log('✅ Gemini Live session connected successfully');
+        console.log('✅ Gemini Live session connected successfully');
 
-      // Send initial context message to establish conversation
-      session.sendClientContent({
-        turns: [{
-          role: 'user',
-          parts: [{ text: 'Hello, I am calling about real estate services. Please respond naturally and help me with my real estate needs.' }]
-        }],
-        turnComplete: true
-      });
-      console.log('📝 Initial context message sent to Gemini');
+        // Send initial context message to establish conversation
+        session.sendClientContent({
+          turns: [{
+            role: 'user',
+            parts: [{ text: 'Hello, I am calling about real estate services. Please respond naturally and help me with my real estate needs.' }]
+          }],
+          turnComplete: true
+        });
+        console.log('📝 Initial context message sent to Gemini');
 
-      // Set up Gemini response handlers
-      session.onmessage = (message) => {
+        // Set up Gemini response handlers
+        session.onmessage = (message) => {
         try {
           console.log('🎤 Gemini response received');
 
@@ -327,11 +328,21 @@ Guidelines:
         console.log('✅ Gemini session closed');
       };
 
-      // Send acknowledgment
-      ws.send(JSON.stringify({
-        event: 'connected',
-        message: 'Voice AI WebSocket connected and ready for conversation'
-      }));
+        // Send acknowledgment
+        ws.send(JSON.stringify({
+          event: 'connected',
+          message: 'Voice AI WebSocket connected and ready for conversation'
+        }));
+
+      } catch (sessionError) {
+        console.error('❌ Failed to connect to Gemini Live session:', sessionError);
+        ws.send(JSON.stringify({
+          event: 'error',
+          message: 'Failed to connect to voice AI service'
+        }));
+        ws.close();
+        return;
+      }
 
       // Handle messages from Twilio
       ws.on('message', async (message) => {
