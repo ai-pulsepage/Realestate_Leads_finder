@@ -155,7 +155,7 @@ router.post('/incoming', checkTokenBalance, async (req, res) => {
 
 /**
  * POST /api/voice-ai/language-menu
- * Plays language selection menu and waits for DTMF input
+ * Plays streamlined bilingual language selection menu
  */
 router.post('/language-menu', async (req, res) => {
   console.log('📞 Language menu requested');
@@ -163,80 +163,58 @@ router.post('/language-menu', async (req, res) => {
 
   try {
     const { To, From, CallSid } = req.body;
-
-    // Extract subscriber's phone number (the To number)
     const subscriberNumber = To;
 
     // Look up subscriber by phone number
-    // PostgreSQL: Direct pool query
-    try {
-      const profileResult = await req.pool.query(
-        'SELECT user_id FROM users WHERE twilio_phone_number = $1',
-        [subscriberNumber]
-      );
+    const subscriberQuery = await req.pool.query(
+      'SELECT user_id, email FROM users WHERE twilio_phone_number = $1',
+      [subscriberNumber]
+    );
 
-      if (profileResult.rows.length === 0) {
-        console.error('❌ No subscriber found for number:', subscriberNumber);
-        const twiml = new twilio.twiml.VoiceResponse();
-        twiml.say('We\'re sorry, but this number is not configured. Please contact support.');
-        twiml.hangup();
-        return res.type('text/xml').send(twiml.toString());
-      }
-
-      const userId = profileResult.rows[0].user_id;
-
-      // Load knowledge data
-      const knowledgeResult = await req.pool.query(
-        'SELECT knowledge_data FROM subscriber_knowledge_base WHERE user_id = $1',
-        [userId]
-      );
-
-      if (knowledgeResult.rows.length === 0) {
-        console.error('❌ No knowledge data found for user:', userId);
-        const twiml = new twilio.twiml.VoiceResponse();
-        twiml.say('We\'re sorry, but the system is not configured. Please contact support.');
-        twiml.hangup();
-        return res.type('text/xml').send(twiml.toString());
-      }
-
-      const knowledgeData = knowledgeResult.rows[0].knowledge_data;
-
-      // Import utility functions
-      const { getLanguageMenuPrompt } = require('../utils/voice-customization');
-
-      // Get language menu prompt
-      const menuPrompt = getLanguageMenuPrompt(knowledgeData);
-
-      // Create TwiML response
+    if (subscriberQuery.rows.length === 0) {
       const twiml = new twilio.twiml.VoiceResponse();
-
-      // Use <Gather> to collect DTMF input
-      const gather = twiml.gather({
-        input: 'dtmf',
-        numDigits: 1,
-        action: '/api/voice-ai/language-selected',
-        method: 'POST',
-        timeout: 5
-      });
-
-      gather.say({ voice: 'Polly.Joanna' }, menuPrompt);
-
-      // If no input, repeat the menu
-      twiml.redirect('/api/voice-ai/language-menu');
-
-      console.log('✅ Language menu TwiML generated');
-      res.type('text/xml').send(twiml.toString());
-
-    } finally {
-      
+      twiml.say('This number is not configured. Please contact support.');
+      res.type('text/xml');
+      return res.send(twiml.toString());
     }
+
+    const subscriber = subscriberQuery.rows[0];
+    const userId = subscriber.user_id;
+
+    // Load subscriber's knowledge base
+    const knowledgeQuery = await req.pool.query(
+      'SELECT knowledge_data FROM subscriber_knowledge_base WHERE user_id = $1',
+      [userId]
+    );
+
+    const knowledgeData = knowledgeQuery.rows[0]?.knowledge_data || {};
+
+    // Create TwiML response with streamlined bilingual menu
+    const twiml = new twilio.twiml.VoiceResponse();
+    const gather = twiml.gather({
+      numDigits: 1,
+      action: '/api/voice-ai/language-selected',
+      method: 'POST',
+      timeout: 5
+    });
+
+    // Streamlined bilingual prompt (no redundancy)
+    gather.say({ voice: 'Polly.Joanna', language: 'en-US' }, 'For English, press 1.');
+    gather.say({ voice: 'Polly.Lupe', language: 'es-US' }, 'Para español, presione 2.');
+
+    // If no input, repeat
+    twiml.redirect('/api/voice-ai/language-menu');
+
+    console.log('✅ Language menu generated');
+    res.type('text/xml');
+    res.send(twiml.toString());
 
   } catch (error) {
     console.error('❌ Error in language menu:', error);
     const twiml = new twilio.twiml.VoiceResponse();
-    twiml.say('We\'re sorry, an error occurred. Please try again later.');
-    twiml.hangup();
-    res.type('text/xml').send(twiml.toString());
+    twiml.say('An error occurred. Please try again.');
+    res.type('text/xml');
+    res.send(twiml.toString());
   }
 });
 
@@ -247,85 +225,95 @@ router.post('/language-menu', async (req, res) => {
 
 /**
  * POST /api/voice-ai/language-selected
- * Processes DTMF language selection and routes to appropriate conversation
+ * Processes language selection and connects to WebSocket for real-time conversation
  */
 router.post('/language-selected', async (req, res) => {
-  console.log('🔢 Language selected');
+  console.log('📞 Language selected');
   console.log('Request body:', req.body);
 
   try {
-    const { To, From, CallSid, Digits } = req.body;
-
-    // Map DTMF digits to language codes
-    const languageMap = {
-      '1': 'en',
-      '2': 'es'
-    };
-
-    const selectedLanguage = languageMap[Digits] || 'en';
-    console.log(`✅ Language selected: ${selectedLanguage} (Digits: ${Digits})`);
-
-    // Extract subscriber's phone number
+    const { Digits, To, From, CallSid } = req.body;
+    const language = Digits === '1' ? 'en' : Digits === '2' ? 'es' : 'en';
     const subscriberNumber = To;
 
+    console.log(`✅ Selected language: ${language}`);
+
     // Look up subscriber
-    // PostgreSQL: Direct pool query
-    try {
-      const profileResult = await req.pool.query(
-        'SELECT user_id FROM users WHERE twilio_phone_number = $1',
-        [subscriberNumber]
-      );
+    const subscriberQuery = await req.pool.query(
+      'SELECT user_id FROM users WHERE twilio_phone_number = $1',
+      [subscriberNumber]
+    );
 
-      if (profileResult.rows.length === 0) {
-        console.error('❌ No subscriber found for number:', subscriberNumber);
-        const twiml = new twilio.twiml.VoiceResponse();
-        twiml.say('We\'re sorry, but this number is not configured.');
-        twiml.hangup();
-        return res.type('text/xml').send(twiml.toString());
-      }
-
-      const userId = profileResult.rows[0].user_id;
-
-      // Load knowledge data
-      const knowledgeResult = await req.pool.query(
-        'SELECT knowledge_data FROM subscriber_knowledge_base WHERE user_id = $1',
-        [userId]
-      );
-
-      const knowledgeData = knowledgeResult.rows[0].knowledge_data;
-
-      // Import utility functions
-      const { getCustomGreeting } = require('../utils/voice-customization');
-
-      // Get custom greeting for selected language
-      const customGreeting = getCustomGreeting(knowledgeData, selectedLanguage);
-
-      // Create TwiML response
+    if (subscriberQuery.rows.length === 0) {
       const twiml = new twilio.twiml.VoiceResponse();
-
-      // Say custom greeting
-      const voice = selectedLanguage === 'es' ? 'Polly.Lupe' : 'Polly.Joanna';
-      twiml.say({ voice }, customGreeting);
-
-      // Connect to media stream with language parameter
-      const connect = twiml.connect();
-      connect.stream({
-        url: `wss://${req.get('host')}/api/voice-ai/media-stream?language=${selectedLanguage}&userId=${userId}`
-      });
-
-      console.log('✅ Connecting to media stream with language:', selectedLanguage);
-      res.type('text/xml').send(twiml.toString());
-
-    } finally {
-      
+      twiml.say('Configuration error.');
+      res.type('text/xml');
+      return res.send(twiml.toString());
     }
 
-  } catch (error) {
-    console.error('❌ Error processing language selection:', error);
+    const userId = subscriberQuery.rows[0].user_id;
+
+    // Update call log with language
+    await req.pool.query(
+      `UPDATE ai_voice_call_logs
+       SET language = $1, call_status = 'in-progress'
+       WHERE call_sid = $2`,
+      [language, CallSid]
+    );
+
+    // Load knowledge base
+    const knowledgeQuery = await req.pool.query(
+      'SELECT knowledge_data FROM subscriber_knowledge_base WHERE user_id = $1',
+      [userId]
+    );
+
+    const knowledgeData = knowledgeQuery.rows[0]?.knowledge_data || {};
+    const languageData = knowledgeData.languages?.[language] || {};
+
+    // Get custom greeting (with underscore fix)
+    let greeting = languageData.greeting;
+
+    // If no custom greeting, use default
+    if (!greeting) {
+      greeting = language === 'en'
+        ? 'Welcome to our service. How can I help you today?'
+        : 'Bienvenido a nuestro servicio. ¿Cómo puedo ayudarle hoy?';
+    }
+
+    // Fix underscores in greeting (replace with spaces)
+    const cleanGreeting = greeting.replace(/_/g, ' ');
+
+    // Create TwiML with greeting and WebSocket connection
     const twiml = new twilio.twiml.VoiceResponse();
-    twiml.say('We\'re sorry, an error occurred.');
-    twiml.hangup();
-    res.type('text/xml').send(twiml.toString());
+
+    // Play custom greeting
+    const voiceMap = { en: 'Polly.Joanna', es: 'Polly.Lupe' };
+    const langMap = { en: 'en-US', es: 'es-US' };
+
+    twiml.say({
+      voice: voiceMap[language],
+      language: langMap[language]
+    }, cleanGreeting);
+
+    // Connect to WebSocket for real-time conversation
+    const host = req.get('host');
+    const protocol = host.includes('localhost') ? 'ws' : 'wss';
+
+    const connect = twiml.connect();
+    connect.stream({
+      url: `${protocol}://${host}/api/voice-ai/media-stream?language=${language}&userId=${userId}&callSid=${CallSid}`
+    });
+
+    console.log(`✅ Connected to WebSocket: ${protocol}://${host}/api/voice-ai/media-stream`);
+    res.type('text/xml');
+    res.send(twiml.toString());
+
+  } catch (error) {
+    console.error('❌ Error in language-selected:', error);
+    const twiml = new twilio.twiml.VoiceResponse();
+    twiml.say('An error occurred.');
+    res.type('text/xml');
+    res.send(twiml.toString());
   }
 });
 
