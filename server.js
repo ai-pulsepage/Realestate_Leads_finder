@@ -165,6 +165,8 @@ try {
 
   // Gemini Live API WebSocket handler for Voice AI conversation processing
   async function handleVoiceAIWebSocket(ws, request, pool) {
+    let session = null; // Declare session in outer scope for cleanup handlers
+
     try {
       // Load Gemini Live API and audio conversion
       const { GoogleGenAI } = require('@google/genai');
@@ -228,7 +230,7 @@ Guidelines:
 
       console.log('🎙️ Connecting to Gemini Live session...');
       try {
-        const session = await client.live.connect({
+        session = await client.live.connect({
           model: model,
           generationConfig: generationConfig
         });
