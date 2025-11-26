@@ -213,7 +213,7 @@ Guidelines:
 - Provide specific, actionable advice for home-related services
 - Emphasize urgency and next steps for conversions`;
 
-      const model = "gemini-2.0-flash-exp";
+      const model = "gemini-2.5-flash-native-audio-preview-09-2025";
       const generationConfig = {
         responseModalities: ["audio"],
         speechConfig: {
@@ -243,10 +243,20 @@ Guidelines:
           if (message.data) {
             console.log('🔊 Gemini audio response received, size:', message.data.length);
 
-            // Convert 16-bit PCM to MULAW for Twilio
-            const pcm16Buffer = Buffer.from(message.data, 'base64');
-            const mulawAudioData = g711.ulawFromPCM(pcm16Buffer);
-            console.log('🔊 Converted to MULAW buffer size:', mulawAudioData.length);
+            // Convert 16-bit PCM (24kHz) to 8kHz PCM, then to MULAW for Twilio
+            // message.data is raw binary PCM data from Gemini (24kHz, 16-bit)
+            const pcm24kBuffer = Buffer.from(message.data);
+
+            // Simple downsampling: 24kHz -> 8kHz (take every 3rd sample)
+            const pcm8kBuffer = Buffer.alloc(Math.floor(pcm24kBuffer.length / 6) * 2); // 16-bit samples
+            for (let i = 0, j = 0; i < pcm24kBuffer.length - 2; i += 6, j += 2) {
+              // Take every 3rd 16-bit sample (24kHz / 3 = 8kHz)
+              pcm8kBuffer[j] = pcm24kBuffer[i];
+              pcm8kBuffer[j + 1] = pcm24kBuffer[i + 1];
+            }
+
+            const mulawAudioData = g711.ulawFromPCM(pcm8kBuffer);
+            console.log('🔊 Resampled to 8kHz PCM size:', pcm8kBuffer.length, 'MULAW size:', mulawAudioData.length);
 
             // Send audio back to Twilio
             ws.send(JSON.stringify({
