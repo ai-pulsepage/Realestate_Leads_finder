@@ -153,7 +153,7 @@ try {
     try {
       // Load Gemini Live API and audio conversion
       const { GoogleGenAI } = require('@google/genai');
-      const { decode: decodeMulaw, encode: encodeMulaw } = require('g711');
+      const g711 = require('g711');
       const client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
       console.log('🎙️ Initializing Gemini Live API for voice conversation...');
@@ -242,7 +242,7 @@ Guidelines:
             }
 
             // Convert PCM to MULAW for Twilio
-            const mulawAudioData = encodeMulaw(pcm8Buffer);
+            const mulawAudioData = g711.encode(pcm8Buffer);
             console.log('🔊 Converted to MULAW buffer size:', mulawAudioData.length);
 
             // Send audio back to Twilio
@@ -334,7 +334,7 @@ Guidelines:
                 console.log('🎵 Received MULAW buffer, size:', mulawBuffer.length);
 
                 // Convert MULAW to 16-bit PCM for Gemini (16kHz expected)
-                const pcmBuffer = decodeMulaw(mulawBuffer);
+                const pcmBuffer = g711.decode(mulawBuffer);
                 // Convert 8-bit PCM to 16-bit PCM (Twilio sends 8-bit, Gemini expects 16-bit)
                 const pcm16Buffer = Buffer.alloc(pcmBuffer.length * 2);
                 for (let i = 0; i < pcmBuffer.length; i++) {
