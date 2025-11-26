@@ -1,0 +1,47 @@
+steps:
+  # Build the Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/github.com/ai-pulsepage/realestate_leads_finder:$COMMIT_SHA'
+      - '.'
+
+  # Push the Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/github.com/ai-pulsepage/realestate_leads_finder:$COMMIT_SHA'
+
+  # Deploy to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'real-estate-leads-api'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/github.com/ai-pulsepage/realestate_leads_finder:$COMMIT_SHA'
+      - '--region'
+      - 'us-east1'
+      - '--allow-unauthenticated'
+      - '--set-env-vars'
+      - 'NODE_ENV=production'
+      - '--vpc-connector'
+      - 'real-estate-connector'
+      - '--set-secrets'
+      - 'DATABASE_URL=database-url:latest'
+      - 'FIREBASE_CONFIG=firebase-config:latest'
+      - 'MIAMI_DADE_API_KEY=miami-dade-api-key:latest'
+      - 'REDIS_URL=redis-url:latest'
+      - 'SENDGRID_API_KEY=sendgrid-api-key:latest'
+      - 'STRIPE_SECRET_KEY=stripe-secret-key:latest'
+      - 'TOGETHER_AI_API_KEY=together-ai-api-key:latest'
+      - 'TWILIO_ACCOUNT_SID=twilio-account-sid:latest'
+      - 'TWILIO_AUTH_TOKEN=twilio-auth-token:latest'
+      - 'TWILIO_PHONE_NUMBER=twilio-phone-number:latest'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+timeout: '1200s'
