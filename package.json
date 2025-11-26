@@ -12,6 +12,8 @@
     "local": "npm run test-db && npm run dev"
   },
   "dependencies": {
+    "@google-cloud/speech": "^6.6.0",
+    "@google-cloud/text-to-speech": "^5.5.0",
     "@google/generative-ai": "^0.24.1",
     "axios": "^1.6.0",
     "cors": "^2.8.5",
