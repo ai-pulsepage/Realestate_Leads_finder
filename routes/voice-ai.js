@@ -116,10 +116,9 @@ router.post('/incoming', checkTokenBalance, async (req, res) => {
     // Log the incoming call
     await req.pool.query(`
       INSERT INTO ai_voice_call_logs (
-        user_id, call_sid, call_type, direction,
-        caller_number, twilio_number, call_status
-      ) VALUES ($1, $2, 'inbound', 'incoming', $3, $4, 'ringing')
-    `, [userId, callSid, callerNumber, twilioNumber]);
+        user_id, phone_number, call_transcript
+      ) VALUES ($1, $2, $3)
+    `, [userId, twilioNumber, `Call SID: ${callSid}, From: ${callerNumber}, Status: ringing`]);
 
     // Load subscriber's knowledge base
     const knowledgeQuery = await req.pool.query(
@@ -253,12 +252,12 @@ router.post('/language-selected', async (req, res) => {
 
     const userId = subscriberQuery.rows[0].user_id;
 
-    // Update call log with language
+    // Update call log with language selection
     await req.pool.query(
       `UPDATE ai_voice_call_logs
-       SET language = $1, call_status = 'in-progress'
-       WHERE call_sid = $2`,
-      [language, CallSid]
+       SET call_transcript = call_transcript || '\nLanguage selected: ' || $1 || ', Status: in-progress'
+       WHERE user_id = $2 AND phone_number = $3 AND call_transcript LIKE '%' || $4 || '%'`,
+      [language, userId, subscriberNumber, CallSid]
     );
 
     // Load knowledge base

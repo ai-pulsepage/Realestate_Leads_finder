@@ -268,9 +268,9 @@ Guidelines:
               // Log AI response to database
               pool.query(`
                 UPDATE ai_voice_call_logs
-                SET conversation_transcript = COALESCE(conversation_transcript, '') || $1 || '\n'
-                WHERE call_sid = $2
-              `, [`AI: ${transcript}`, callSid]).catch(err =>
+                SET call_transcript = COALESCE(call_transcript, '') || '\nAI: ' || $1
+                WHERE user_id = $2 AND call_transcript LIKE '%' || $3 || '%'
+              `, [transcript, userId, callSid]).catch(err =>
                 console.error('❌ Error logging AI response:', err)
               );
             }
@@ -286,9 +286,9 @@ Guidelines:
               // Log user input to database
               pool.query(`
                 UPDATE ai_voice_call_logs
-                SET conversation_transcript = COALESCE(conversation_transcript, '') || $1 || '\n'
-                WHERE call_sid = $2
-              `, [`Caller: ${userTranscript}`, callSid]).catch(err =>
+                SET call_transcript = COALESCE(call_transcript, '') || '\nCaller: ' || $1
+                WHERE user_id = $2 AND call_transcript LIKE '%' || $3 || '%'
+              `, [userTranscript, userId, callSid]).catch(err =>
                 console.error('❌ Error logging user input:', err)
               );
             }
