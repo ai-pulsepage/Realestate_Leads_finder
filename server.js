@@ -133,10 +133,25 @@ try {
       const path = require('path');
       const migrationPath = path.join(__dirname, 'migrations', '007_add_language_to_call_logs.sql');
       const migrationSQL = fs.readFileSync(migrationPath, 'utf8');
-      
+
       await pool.query(migrationSQL);
-      
+
       res.json({ success: true, message: 'Migration 007 completed' });
+    } catch (error) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.post('/admin/run-migration-008', async (req, res) => {
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const migrationPath = path.join(__dirname, 'migrations', '008_fix_ai_voice_call_logs_schema.sql');
+      const migrationSQL = fs.readFileSync(migrationPath, 'utf8');
+
+      await pool.query(migrationSQL);
+
+      res.json({ success: true, message: 'Migration 008 completed' });
     } catch (error) {
       res.status(500).json({ success: false, error: error.message });
     }
