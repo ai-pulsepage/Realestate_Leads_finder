@@ -7,6 +7,11 @@ try {
   const express = require('express');
   console.log('✓ Express loaded');
 
+  console.log('Loading WebSocket...');
+  const WebSocket = require('ws');
+  const url = require('url');
+  console.log('✓ WebSocket loaded');
+
   console.log('Loading database config...');
   const { pool, checkDatabase } = require('./config/database');
   console.log('✓ Database config loaded');
@@ -130,9 +135,82 @@ try {
     }
   });
 
-  
-  app.listen(PORT, '0.0.0.0', () => {
+  // ===============================================
+  // WEBSOCKET SERVER SETUP
+  // ===============================================
+
+  const wss = new WebSocket.Server({ noServer: true });
+
+  // Minimal WebSocket handler for Voice AI - logs params only
+  function handleVoiceAIWebSocket(ws, request, pool) {
+    try {
+      // Extract query parameters from WebSocket URL
+      const parsedUrl = url.parse(request.url, true);
+      const { language = 'en', userId, callSid } = parsedUrl.query;
+
+      console.log('🎙️ MINIMAL WEBSOCKET TEST - Parameter Extraction:');
+      console.log('===========================================');
+      console.log(`Raw URL: ${request.url}`);
+      console.log(`Language: ${language}`);
+      console.log(`User ID: ${userId}`);
+      console.log(`Call SID: ${callSid}`);
+      console.log('===========================================');
+
+      // Send acknowledgment
+      ws.send(JSON.stringify({
+        event: 'connected',
+        message: 'WebSocket connected - minimal test mode'
+      }));
+
+      // Handle messages (minimal response)
+      ws.on('message', (message) => {
+        try {
+          const data = JSON.parse(message);
+          console.log('📨 WebSocket message received:', data.event);
+
+          if (data.event === 'start') {
+            console.log('🎙️ Stream started - minimal test');
+            ws.send(JSON.stringify({
+              event: 'started',
+              message: 'Stream started - minimal test mode'
+            }));
+          }
+        } catch (error) {
+          console.error('❌ WebSocket message error:', error);
+        }
+      });
+
+      ws.on('close', () => {
+        console.log('🔌 WebSocket closed - minimal test');
+      });
+
+      ws.on('error', (error) => {
+        console.error('❌ WebSocket error - minimal test:', error);
+      });
+
+    } catch (error) {
+      console.error('❌ Error in minimal WebSocket handler:', error);
+      ws.close();
+    }
+  }
+
+  // Handle WebSocket upgrades
+  const server = app.listen(PORT, '0.0.0.0', () => {
     console.log('✓✓✓ SERVER STARTED ✓✓✓');
+  });
+
+  server.on('upgrade', (request, socket, head) => {
+    const pathname = url.parse(request.url).pathname;
+
+    if (pathname === '/api/voice-ai/media-stream') {
+      console.log('🔌 WebSocket upgrade requested for Voice AI');
+      wss.handleUpgrade(request, socket, head, (ws) => {
+        handleVoiceAIWebSocket(ws, request, pool);
+      });
+    } else {
+      console.log(`❌ WebSocket upgrade rejected for path: ${pathname}`);
+      socket.destroy();
+    }
   });
 
   process.on('SIGTERM', async () => {
