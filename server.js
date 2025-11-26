@@ -243,7 +243,9 @@ try {
       // Handle messages from Twilio
       ws.on('message', async (message) => {
         try {
+          console.log('📨 WebSocket message received:', message.toString().substring(0, 200) + '...');
           const data = JSON.parse(message.toString());
+          console.log('📨 Parsed WebSocket message:', JSON.stringify(data, null, 2));
 
           if (data.event === 'start') {
             console.log('🎙️ Audio stream started');
@@ -274,6 +276,7 @@ try {
             }
 
             recognizeStream.on('data', async (data) => {
+                console.log('🎤 Speech recognition data received:', JSON.stringify(data, null, 2));
                 if (data.results[0] && data.results[0].alternatives[0]) {
                   const transcript = data.results[0].alternatives[0].transcript;
                   console.log(`🎤 Speech recognized: "${transcript}"`);
@@ -300,8 +303,9 @@ Current user question: ${transcript}
 
 Provide a helpful, concise response as a real estate assistant. Keep responses under 100 words.`;
 
+                      console.log('🤖 Generating AI response with prompt:', prompt.substring(0, 200) + '...');
                       const aiResponse = await generateChatResponse(prompt, knowledgeBase);
-                      console.log(`🤖 AI Response: "${aiResponse}"`);
+                      console.log(`🤖 AI Response generated: "${aiResponse}"`);
 
                       // Add AI response to conversation history
                       conversationHistory.push({ role: 'assistant', content: aiResponse });
@@ -314,6 +318,7 @@ Provide a helpful, concise response as a real estate assistant. Keep responses u
                       `, [`AI: ${aiResponse}`, callSid]);
 
                       // Convert response to speech
+                      console.log('🔊 Generating TTS for response:', aiResponse.substring(0, 100) + '...');
                       const ttsRequest = {
                         input: { text: aiResponse },
                         voice: {
@@ -326,16 +331,23 @@ Provide a helpful, concise response as a real estate assistant. Keep responses u
                         }
                       };
 
+                      console.log('🔊 TTS request:', JSON.stringify(ttsRequest, null, 2));
                       const [ttsResponse] = await ttsClient.synthesizeSpeech(ttsRequest);
+                      console.log('🔊 TTS response received, audio content length:', ttsResponse.audioContent?.length || 0);
 
                       // Send audio back to Twilio
                       if (ttsResponse.audioContent) {
+                        const audioPayload = ttsResponse.audioContent.toString('base64');
+                        console.log('🔊 Sending audio to Twilio, payload length:', audioPayload.length);
                         ws.send(JSON.stringify({
                           event: 'media',
                           media: {
-                            payload: ttsResponse.audioContent.toString('base64')
+                            payload: audioPayload
                           }
                         }));
+                        console.log('🔊 Audio sent to Twilio successfully');
+                      } else {
+                        console.log('🔊 No audio content in TTS response');
                       }
 
                     } catch (aiError) {
@@ -373,9 +385,13 @@ Provide a helpful, concise response as a real estate assistant. Keep responses u
 
           } else if (data.event === 'media') {
             // Receive audio data from Twilio
+            console.log('🎵 Media event received, payload length:', data.media?.payload?.length || 0);
             if (data.media && data.media.payload && recognizeStream) {
               const audioChunk = Buffer.from(data.media.payload, 'base64');
+              console.log('🎵 Writing audio chunk to recognition stream, size:', audioChunk.length);
               recognizeStream.write(audioChunk);
+            } else {
+              console.log('🎵 Media event ignored - missing payload or no recognition stream');
             }
 
           } else if (data.event === 'stop') {
@@ -420,7 +436,10 @@ Provide a helpful, concise response as a real estate assistant. Keep responses u
 
     if (pathname === '/api/voice-ai/media-stream') {
       console.log('🔌 WebSocket upgrade requested for Voice AI');
+      console.log('🔌 Request URL:', request.url);
+      console.log('🔌 Request headers:', JSON.stringify(request.headers, null, 2));
       wss.handleUpgrade(request, socket, head, (ws) => {
+        console.log('🔌 WebSocket connection established successfully');
         handleVoiceAIWebSocket(ws, request, pool);
       });
     } else {
