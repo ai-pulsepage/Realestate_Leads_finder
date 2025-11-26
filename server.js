@@ -148,41 +148,15 @@ try {
 
   const wss = new WebSocket.Server({ noServer: true });
 
-  // Full WebSocket handler for Voice AI conversation processing
+  // Gemini Live API WebSocket handler for Voice AI conversation processing
   async function handleVoiceAIWebSocket(ws, request, pool) {
     try {
-      // Load required modules
-      const speech = require('@google-cloud/speech');
-      const textToSpeech = require('@google-cloud/text-to-speech');
-      const { generateChatResponse } = require('./api/togetherAi');
+      // Load Gemini Live API and audio conversion
+      const { GoogleGenAI } = require('@google/genai');
+      const { decode: decodeMulaw, encode: encodeMulaw } = require('g711');
+      const client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-      // Initialize Google Cloud clients with error handling
-      let speechClient, ttsClient;
-      try {
-        speechClient = new speech.SpeechClient();
-        console.log('✅ Speech client initialized');
-      } catch (error) {
-        console.error('❌ Failed to initialize Speech client:', error);
-        ws.send(JSON.stringify({
-          event: 'error',
-          message: 'Speech service unavailable'
-        }));
-        ws.close();
-        return;
-      }
-
-      try {
-        ttsClient = new textToSpeech.TextToSpeechClient();
-        console.log('✅ Text-to-Speech client initialized');
-      } catch (error) {
-        console.error('❌ Failed to initialize Text-to-Speech client:', error);
-        ws.send(JSON.stringify({
-          event: 'error',
-          message: 'Text-to-speech service unavailable'
-        }));
-        ws.close();
-        return;
-      }
+      console.log('🎙️ Initializing Gemini Live API for voice conversation...');
 
       // Extract query parameters from WebSocket URL
       const parsedUrl = url.parse(request.url, true);
@@ -213,26 +187,110 @@ try {
         knowledgeBase = 'You are a helpful real estate assistant.';
       }
 
-      // Conversation state
-      let conversationHistory = [];
-      let isListening = false;
-      let audioBuffer = Buffer.alloc(0);
+      // Initialize Gemini Live API session
+      const systemInstruction = `You are a helpful real estate assistant. Use this knowledge base context: ${knowledgeBase}
 
-      // Configure speech recognition
-      const speechConfig = {
-        encoding: 'MULAW',
-        sampleRateHertz: 8000,
-        languageCode: language === 'es' ? 'es-US' : 'en-US',
-        enableAutomaticPunctuation: true,
-        model: 'phone_call'
+Guidelines:
+- Be conversational and friendly
+- Keep responses under 100 words
+- Focus on real estate questions
+- Ask clarifying questions when needed
+- Provide specific, actionable advice`;
+
+      const model = "gemini-2.5-flash-native-audio-preview-09-2025";
+      const config = {
+        responseModalities: ["AUDIO"],
+        systemInstruction: systemInstruction
       };
 
-      const requestConfig = {
-        config: speechConfig,
-        interimResults: false
+      console.log('🎙️ Connecting to Gemini Live session...');
+      const session = await client.live.connect({
+        model: model,
+        config: config
+      });
+
+      console.log('✅ Gemini Live session connected successfully');
+
+      // Set up Gemini response handlers
+      session.onmessage = (message) => {
+        try {
+          console.log('🎤 Gemini response received');
+
+          // Handle audio response from Gemini
+          if (message.data) {
+            console.log('🔊 Gemini audio response received, size:', message.data.length);
+
+            // Convert 16-bit PCM back to 8-bit PCM, then to MULAW for Twilio
+            const pcm16Buffer = Buffer.from(message.data, 'base64');
+            const pcm8Buffer = Buffer.alloc(pcm16Buffer.length / 2);
+
+            for (let i = 0; i < pcm8Buffer.length; i++) {
+              const sample = pcm16Buffer.readInt16LE(i * 2) / 256; // Scale down from 16-bit
+              pcm8Buffer[i] = Math.max(0, Math.min(255, sample + 128)); // Convert to unsigned 8-bit
+            }
+
+            // Convert PCM to MULAW for Twilio
+            const mulawAudioData = encodeMulaw(pcm8Buffer);
+            console.log('🔊 Converted to MULAW buffer size:', mulawAudioData.length);
+
+            // Send audio back to Twilio
+            ws.send(JSON.stringify({
+              event: 'media',
+              media: {
+                payload: mulawAudioData.toString('base64')
+              }
+            }));
+            console.log('🔊 MULAW audio sent to Twilio successfully');
+          }
+
+          // Handle text transcripts (both user input and AI responses)
+          if (message.serverContent && message.serverContent.modelTurn) {
+            const turn = message.serverContent.modelTurn;
+            if (turn.parts && turn.parts[0] && turn.parts[0].text) {
+              const transcript = turn.parts[0].text;
+              console.log(`🎤 Gemini transcript: "${transcript}"`);
+
+              // Log AI response to database
+              pool.query(`
+                UPDATE ai_voice_call_logs
+                SET conversation_transcript = COALESCE(conversation_transcript, '') || $1 || '\n'
+                WHERE call_sid = $2
+              `, [`AI: ${transcript}`, callSid]).catch(err =>
+                console.error('❌ Error logging AI response:', err)
+              );
+            }
+          }
+
+          // Handle user input transcripts
+          if (message.serverContent && message.serverContent.userTurn) {
+            const turn = message.serverContent.userTurn;
+            if (turn.parts && turn.parts[0] && turn.parts[0].text) {
+              const userTranscript = turn.parts[0].text;
+              console.log(`🎤 User said: "${userTranscript}"`);
+
+              // Log user input to database
+              pool.query(`
+                UPDATE ai_voice_call_logs
+                SET conversation_transcript = COALESCE(conversation_transcript, '') || $1 || '\n'
+                WHERE call_sid = $2
+              `, [`Caller: ${userTranscript}`, callSid]).catch(err =>
+                console.error('❌ Error logging user input:', err)
+              );
+            }
+          }
+
+        } catch (error) {
+          console.error('❌ Error processing Gemini response:', error);
+        }
       };
 
-      let recognizeStream = null;
+      session.onerror = (error) => {
+        console.error('❌ Gemini session error:', error);
+      };
+
+      session.onclose = () => {
+        console.log('✅ Gemini session closed');
+      };
 
       // Send acknowledgment
       ws.send(JSON.stringify({
@@ -248,156 +306,55 @@ try {
           console.log('📨 Parsed WebSocket message:', JSON.stringify(data, null, 2));
 
           if (data.event === 'start') {
-            console.log('🎙️ Audio stream started');
+            console.log('🎙️ Audio stream started - Gemini Live API ready');
             ws.send(JSON.stringify({
               event: 'started',
               message: 'Audio stream started successfully'
             }));
 
-            // Start speech recognition
-            try {
-              recognizeStream = speechClient.streamingRecognize(requestConfig)
-                .on('error', (error) => {
-                  console.error('❌ Speech recognition error:', error);
-                  // Send error message to client
-                  ws.send(JSON.stringify({
-                    event: 'error',
-                    message: 'Speech recognition failed: ' + error.message
-                  }));
-                })
-            } catch (error) {
-              console.error('❌ Failed to start speech recognition:', error);
-              ws.send(JSON.stringify({
-                event: 'error',
-                message: 'Failed to start speech recognition'
-              }));
-              ws.close();
-              return;
-            }
-
-            recognizeStream.on('data', async (data) => {
-                console.log('🎤 Speech recognition data received:', JSON.stringify(data, null, 2));
-                if (data.results[0] && data.results[0].alternatives[0]) {
-                  const transcript = data.results[0].alternatives[0].transcript;
-                  console.log(`🎤 Speech recognized: "${transcript}"`);
-
-                  if (transcript.trim()) {
-                    // Log the user input
-                    await pool.query(`
-                      UPDATE ai_voice_call_logs
-                      SET conversation_transcript = COALESCE(conversation_transcript, '') || $1 || '\n'
-                      WHERE call_sid = $2
-                    `, [`Caller: ${transcript}`, callSid]);
-
-                    // Add to conversation history
-                    conversationHistory.push({ role: 'user', content: transcript });
-
-                    // Generate AI response
-                    try {
-                      const prompt = `You are a helpful real estate assistant. Use this knowledge base context: ${knowledgeBase}
-
-Previous conversation:
-${conversationHistory.slice(-4).map(msg => `${msg.role}: ${msg.content}`).join('\n')}
-
-Current user question: ${transcript}
-
-Provide a helpful, concise response as a real estate assistant. Keep responses under 100 words.`;
-
-                      console.log('🤖 Generating AI response with prompt:', prompt.substring(0, 200) + '...');
-                      const aiResponse = await generateChatResponse(prompt, knowledgeBase);
-                      console.log(`🤖 AI Response generated: "${aiResponse}"`);
-
-                      // Add AI response to conversation history
-                      conversationHistory.push({ role: 'assistant', content: aiResponse });
-
-                      // Log the AI response
-                      await pool.query(`
-                        UPDATE ai_voice_call_logs
-                        SET conversation_transcript = COALESCE(conversation_transcript, '') || $1 || '\n'
-                        WHERE call_sid = $2
-                      `, [`AI: ${aiResponse}`, callSid]);
-
-                      // Convert response to speech
-                      console.log('🔊 Generating TTS for response:', aiResponse.substring(0, 100) + '...');
-                      const ttsRequest = {
-                        input: { text: aiResponse },
-                        voice: {
-                          languageCode: language === 'es' ? 'es-US' : 'en-US',
-                          name: language === 'es' ? 'es-US-Neural2-C' : 'en-US-Neural2-D'
-                        },
-                        audioConfig: {
-                          audioEncoding: 'MULAW',
-                          sampleRateHertz: 8000
-                        }
-                      };
-
-                      console.log('🔊 TTS request:', JSON.stringify(ttsRequest, null, 2));
-                      const [ttsResponse] = await ttsClient.synthesizeSpeech(ttsRequest);
-                      console.log('🔊 TTS response received, audio content length:', ttsResponse.audioContent?.length || 0);
-
-                      // Send audio back to Twilio
-                      if (ttsResponse.audioContent) {
-                        const audioPayload = ttsResponse.audioContent.toString('base64');
-                        console.log('🔊 Sending audio to Twilio, payload length:', audioPayload.length);
-                        ws.send(JSON.stringify({
-                          event: 'media',
-                          media: {
-                            payload: audioPayload
-                          }
-                        }));
-                        console.log('🔊 Audio sent to Twilio successfully');
-                      } else {
-                        console.log('🔊 No audio content in TTS response');
-                      }
-
-                    } catch (aiError) {
-                      console.error('❌ AI processing error:', aiError);
-                      // Send fallback response
-                      const fallbackText = language === 'es'
-                        ? 'Lo siento, hubo un error procesando tu solicitud.'
-                        : 'Sorry, there was an error processing your request.';
-
-                      const fallbackRequest = {
-                        input: { text: fallbackText },
-                        voice: {
-                          languageCode: language === 'es' ? 'es-US' : 'en-US',
-                          name: language === 'es' ? 'es-US-Neural2-C' : 'en-US-Neural2-D'
-                        },
-                        audioConfig: {
-                          audioEncoding: 'MULAW',
-                          sampleRateHertz: 8000
-                        }
-                      };
-
-                      const [fallbackResponse] = await ttsClient.synthesizeSpeech(fallbackRequest);
-                      if (fallbackResponse.audioContent) {
-                        ws.send(JSON.stringify({
-                          event: 'media',
-                          media: {
-                            payload: fallbackResponse.audioContent.toString('base64')
-                          }
-                        }));
-                      }
-                    }
-                  }
-                }
-              });
-
           } else if (data.event === 'media') {
-            // Receive audio data from Twilio
+            // Receive audio data from Twilio and send to Gemini
             console.log('🎵 Media event received, payload length:', data.media?.payload?.length || 0);
-            if (data.media && data.media.payload && recognizeStream) {
-              const audioChunk = Buffer.from(data.media.payload, 'base64');
-              console.log('🎵 Writing audio chunk to recognition stream, size:', audioChunk.length);
-              recognizeStream.write(audioChunk);
+            if (data.media && data.media.payload) {
+              try {
+                // Convert base64 MULAW audio to buffer
+                const mulawBuffer = Buffer.from(data.media.payload, 'base64');
+                console.log('🎵 Received MULAW buffer, size:', mulawBuffer.length);
+
+                // Convert MULAW to 16-bit PCM for Gemini (16kHz expected)
+                const pcmBuffer = decodeMulaw(mulawBuffer);
+                // Convert 8-bit PCM to 16-bit PCM (Twilio sends 8-bit, Gemini expects 16-bit)
+                const pcm16Buffer = Buffer.alloc(pcmBuffer.length * 2);
+                for (let i = 0; i < pcmBuffer.length; i++) {
+                  const sample = pcmBuffer[i] - 128; // Convert unsigned 8-bit to signed
+                  pcm16Buffer.writeInt16LE(sample * 256, i * 2); // Scale to 16-bit
+                }
+                console.log('🎵 Converted to 16-bit PCM buffer, size:', pcm16Buffer.length);
+
+                // Send audio to Gemini Live API
+                session.sendRealtimeInput({
+                  audio: {
+                    data: pcm16Buffer.toString('base64'),
+                    mimeType: "audio/pcm;rate=16000"
+                  }
+                });
+                console.log('🎵 Audio sent to Gemini Live API');
+
+              } catch (geminiError) {
+                console.error('❌ Gemini processing error:', geminiError);
+              }
             } else {
-              console.log('🎵 Media event ignored - missing payload or no recognition stream');
+              console.log('🎵 Media event ignored - missing payload');
             }
 
           } else if (data.event === 'stop') {
             console.log('🎙️ Audio stream stopped');
-            if (recognizeStream) {
-              recognizeStream.end();
+            // Close Gemini session
+            try {
+              session.close();
+              console.log('✅ Gemini session closed');
+            } catch (error) {
+              console.error('❌ Error closing Gemini session:', error);
             }
           }
 
@@ -408,15 +365,25 @@ Provide a helpful, concise response as a real estate assistant. Keep responses u
 
       ws.on('close', () => {
         console.log('🔌 WebSocket closed');
-        if (recognizeStream) {
-          recognizeStream.end();
+        // Clean up Gemini session
+        try {
+          if (session) {
+            session.close();
+          }
+        } catch (error) {
+          console.error('❌ Error closing Gemini session:', error);
         }
       });
 
       ws.on('error', (error) => {
         console.error('❌ WebSocket error:', error);
-        if (recognizeStream) {
-          recognizeStream.end();
+        // Clean up Gemini session
+        try {
+          if (session) {
+            session.close();
+          }
+        } catch (cleanupError) {
+          console.error('❌ Error closing Gemini session on WebSocket error:', cleanupError);
         }
       });
 
