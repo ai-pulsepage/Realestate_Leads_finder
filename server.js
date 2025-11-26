@@ -171,7 +171,10 @@ try {
       // Load Gemini Live API and audio conversion
       const { GoogleGenAI, Modality } = require('@google/genai');
       const g711 = require('g711');
-      const client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const client = new GoogleGenAI({
+        apiKey: process.env.GEMINI_API_KEY,
+        httpOptions: { apiVersion: 'v1alpha' }
+      });
 
       console.log('🎙️ Initializing Gemini Live API for voice conversation...');
 
@@ -215,7 +218,7 @@ Guidelines:
 - Provide specific, actionable advice for home-related services
 - Emphasize urgency and next steps for conversions`;
 
-      const model = "gemini-2.5-flash-native-audio-preview-09-2025";
+      const model = "gemini-2.0-flash-live-001";
       const config = {
         responseModalities: [Modality.AUDIO],
         speechConfig: {
