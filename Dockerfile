@@ -25,4 +25,4 @@ EXPOSE 8080
 #   CMD curl -f http://localhost:8080/health || exit 1
 
 # Start the application (use minimal version for testing)
-CMD ["node", "server-minimal.js"]
+CMD node server-minimal.js

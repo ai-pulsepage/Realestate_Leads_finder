@@ -29,6 +29,21 @@ app.get('/health', (req, res) => {
 });
 
 const PORT = process.env.PORT || 8080;
+console.log(`🚀 Starting minimal server on port ${PORT}...`);
+
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`✅ Minimal test server listening on port ${PORT}`);
+  console.log(`✅ Minimal test server successfully listening on port ${PORT}`);
+  console.log(`📍 Server URL: http://0.0.0.0:${PORT}`);
+  console.log(`🌐 Health check URL: http://0.0.0.0:${PORT}/health`);
+});
+
+// Keep the process alive
+process.on('SIGTERM', () => {
+  console.log('📴 Received SIGTERM, shutting down gracefully...');
+  process.exit(0);
+});
+
+process.on('SIGINT', () => {
+  console.log('📴 Received SIGINT, shutting down gracefully...');
+  process.exit(0);
 });
