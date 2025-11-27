@@ -220,7 +220,7 @@ Guidelines:
 
       const model = "gemini-2.0-flash-live-001";
       const config = {
-        responseModalities: [Modality.AUDIO],
+        responseModalities: [Modality.AUDIO, Modality.TEXT],
         speechConfig: {
           voiceConfig: {
             prebuiltVoiceConfig: {
