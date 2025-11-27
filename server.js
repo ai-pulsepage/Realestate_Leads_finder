@@ -382,24 +382,52 @@ Guidelines:
                 const mulawBuffer = Buffer.from(data.media.payload, 'base64');
                 console.log('🎵 Received MULAW buffer, size:', mulawBuffer.length);
 
-                // Convert MULAW to 16-bit PCM (stays at 8kHz)
+                // Convert MULAW to 16-bit PCM (8kHz)
                 const pcm8kBuffer = g711.ulawToPCM(mulawBuffer);
                 console.log('🎵 Converted MULAW to PCM (8kHz), size:', pcm8kBuffer.length);
 
-                // Encode to base64
-                const base64Pcm = pcm8kBuffer.toString('base64');
+                // Upsample 8kHz → 16kHz using correct linear interpolation
+                // Input: 1 sample, Output: 2 samples (original + interpolated)
+                const inputSamples = pcm8kBuffer.length / 2;  // 16-bit = 2 bytes per sample
+                const outputSamples = inputSamples * 2;       // Double the sample rate
+                const pcm16kBuffer = Buffer.alloc(outputSamples * 2);  // 2 bytes per sample
 
-                // Send directly to Gemini at 8kHz (Gemini will resample internally)
+                for (let i = 0; i < inputSamples - 1; i++) {
+                  // Read current and next sample (16-bit little-endian)
+                  const sample1 = pcm8kBuffer.readInt16LE(i * 2);
+                  const sample2 = pcm8kBuffer.readInt16LE((i + 1) * 2);
+
+                  // Write original sample
+                  pcm16kBuffer.writeInt16LE(sample1, i * 4);
+
+                  // Write interpolated sample (average of current and next)
+                  const interpolated = Math.round((sample1 + sample2) / 2);
+                  pcm16kBuffer.writeInt16LE(interpolated, i * 4 + 2);
+                }
+
+                // Handle last sample (no next sample to interpolate with)
+                const lastSample = pcm8kBuffer.readInt16LE((inputSamples - 1) * 2);
+                pcm16kBuffer.writeInt16LE(lastSample, (outputSamples - 2) * 2);
+                pcm16kBuffer.writeInt16LE(lastSample, (outputSamples - 1) * 2);
+
+                console.log('🎵 Upsampled to PCM (16kHz), size:', pcm16kBuffer.length);
+
+                // Encode to base64
+                const base64Pcm = pcm16kBuffer.toString('base64');
+
+                // Send to Gemini at 16kHz
                 if (session) {
+                  console.log('🔍 About to call sendRealtimeInput, session exists:', !!session);
                   session.sendRealtimeInput({
                     audio: {
                       data: base64Pcm,
-                      mimeType: 'audio/pcm;rate=8000'  // Gemini will resample internally
+                      mimeType: 'audio/pcm;rate=16000'  // Matches actual 16kHz sample rate
                     }
                   });
-                  console.log('🎵 Audio sent to Gemini Live API (8kHz PCM)');
+                  console.log('✅ sendRealtimeInput called successfully');
+                  console.log('🎵 Audio sent to Gemini Live API (16kHz PCM)');
                 } else {
-                  console.error('❌ session is null');
+                  console.error('❌ session is null - cannot send audio!');
                 }
 
               } catch (geminiError) {
