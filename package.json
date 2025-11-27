@@ -5,7 +5,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js",
+    "start:worker": "node workers/email-sender.js",
+    "dev": "nodemon server.js",
     "build": "echo 'No build step required'",
     "test": "jest",
     "test-db": "node test-db-connection.js",
