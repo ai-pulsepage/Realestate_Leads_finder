@@ -352,9 +352,11 @@ Guidelines:
       // Handle messages from Twilio
       ws.on('message', async (message) => {
         try {
-          console.log('📨 WebSocket message received:', message.toString().substring(0, 200) + '...');
-          const data = JSON.parse(message.toString());
-          console.log('📨 Parsed WebSocket message:', JSON.stringify(data, null, 2));
+          console.log('🔍 RAW MESSAGE TYPE:', typeof message);
+          console.log('🔍 RAW MESSAGE:', message);
+
+          const data = JSON.parse(message);  // Try without .toString() first
+          console.log('✅ PARSED:', data.event);
 
           if (data.event === 'start') {
             console.log('🎙️ Audio stream started - Gemini Live API ready');
@@ -416,7 +418,17 @@ Guidelines:
           }
 
         } catch (error) {
-          console.error('❌ WebSocket message processing error:', error);
+          console.error('❌ PARSE ERROR:', error.message);
+          console.error('❌ RAW:', message);
+          console.error('❌ TYPE:', typeof message);
+
+          // Try alternate parsing
+          try {
+            const data = JSON.parse(message.toString());
+            console.log('✅ PARSED WITH toString():', data.event);
+          } catch (e2) {
+            console.error('❌ STILL FAILED:', e2.message);
+          }
         }
       });
 
