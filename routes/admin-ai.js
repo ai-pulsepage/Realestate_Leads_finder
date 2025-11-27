@@ -7,8 +7,14 @@ const express = require('express');
 const router = express.Router();
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-// Initialize Gemini
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+// Initialize Gemini Lazily
+const getGenAI = () => {
+    if (!process.env.GEMINI_API_KEY) {
+        console.warn('⚠️ GEMINI_API_KEY is not set. AI features will be disabled.');
+        return null;
+    }
+    return new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+};
 
 // ============================================================
 // POST /api/admin/generate-persona
@@ -22,6 +28,14 @@ router.post('/generate-persona', async (req, res) => {
             return res.status(400).json({
                 success: false,
                 message: 'Description is required'
+            });
+        }
+
+        const genAI = getGenAI();
+        if (!genAI) {
+            return res.status(503).json({
+                success: false,
+                message: 'AI service not configured (GEMINI_API_KEY missing)'
             });
         }
 

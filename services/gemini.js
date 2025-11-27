@@ -5,8 +5,14 @@
 
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-// Initialize Gemini
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+// Initialize Gemini Lazily
+const getGenAI = () => {
+  if (!process.env.GEMINI_API_KEY) {
+    console.warn('⚠️ GEMINI_API_KEY is not set. AI features will be disabled.');
+    return null;
+  }
+  return new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+};
 
 /**
  * Generate intelligent voice response based on conversation context
