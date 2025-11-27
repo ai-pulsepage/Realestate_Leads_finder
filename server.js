@@ -252,13 +252,26 @@ Guidelines:
             console.log('📝 Client content received:', JSON.stringify(message.clientContent, null, 2));
           }
 
-          // Handle audio response from Gemini
+          // Handle audio response from Gemini (supports both binary and inline formats)
+          let audioData = null;
+
           if (message.data) {
-            console.log('🔊 Gemini audio response received, size:', message.data.length);
+            // Legacy format: raw binary audio
+            audioData = Buffer.from(message.data);
+          } else if (message.serverContent?.modelTurn?.parts?.[0]?.inlineData) {
+            // New format: JSON audio in modelTurn.parts[0].inlineData
+            const inline = message.serverContent.modelTurn.parts[0].inlineData;
+            if (inline.mimeType.startsWith('audio/')) {
+              audioData = Buffer.from(inline.data, 'base64');
+            }
+          }
+
+          if (audioData) {
+            console.log('🔊 Gemini audio response received, size:', audioData.length);
 
             // Convert 16-bit PCM (24kHz) to 8kHz PCM, then to MULAW for Twilio
-            // message.data is raw binary PCM data from Gemini (24kHz, 16-bit)
-            const pcm24kBuffer = Buffer.from(message.data);
+            // audioData is raw binary PCM data from Gemini (24kHz, 16-bit)
+            const pcm24kBuffer = audioData;
 
             // Simple downsampling: 24kHz -> 8kHz (take every 3rd sample)
             const pcm8kBuffer = Buffer.alloc(Math.floor(pcm24kBuffer.length / 6) * 2); // 16-bit samples
