@@ -163,348 +163,177 @@ try {
 
   const wss = new WebSocket.Server({ noServer: true });
 
-  // Gemini Live API WebSocket handler for Voice AI conversation processing
+  // Google-Native Voice AI Handler (STT -> LLM -> TTS)
   async function handleVoiceAIWebSocket(ws, request, pool) {
-    let session = null; // Declare session in outer scope for cleanup handlers
+    // Initialize Clients
+    const speech = require('@google-cloud/speech');
+    const tts = require('@google-cloud/text-to-speech');
+    const { GoogleGenerativeAI } = require('@google/generative-ai');
 
+    const speechClient = new speech.SpeechClient();
+    const ttsClient = new tts.TextToSpeechClient();
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+
+    let recognizeStream = null;
+    let isSpeaking = false;
+    let conversationHistory = [];
+
+    console.log('🎙️ Initializing Google-Native Voice AI Session...');
+
+    // Extract query parameters
+    const url = require('url');
+    const parsedUrl = url.parse(request.url, true);
+    const { language = 'en', userId, callSid } = parsedUrl.query;
+
+    // Load Knowledge Base
+    let knowledgeBase = 'You are a helpful real estate assistant.';
     try {
-      // Load Gemini Live API and audio conversion
-      const { GoogleGenAI, Modality } = require('@google/genai');
-      const g711 = require('g711');
-      const waveResampler = require('wave-resampler');
-      const client = new GoogleGenAI({
-        apiKey: process.env.GEMINI_API_KEY,
-        httpOptions: { apiVersion: 'v1alpha' }
-      });
+      const kbQuery = await pool.query(
+        'SELECT knowledge_data FROM subscriber_knowledge_base WHERE user_id = $1',
+        [userId]
+      );
+      if (kbQuery.rows.length > 0) {
+        const kbData = kbQuery.rows[0].knowledge_data || {};
+        knowledgeBase = kbData.languages?.[language]?.content || kbData.content || knowledgeBase;
+      }
+    } catch (error) {
+      console.error('❌ Error loading knowledge base:', error);
+    }
 
-      console.log('🎙️ Initializing Gemini Live API for voice conversation...');
+    // System Prompt
+    const systemPrompt = `You are a helpful real estate assistant.
+Context: ${knowledgeBase}
+Guidelines:
+- Keep responses concise (under 2 sentences).
+- Be conversational and friendly.
+- Ask one question at a time.
+- Do not use markdown or emojis (this is for voice).`;
 
-      // Extract query parameters from WebSocket URL
-      const parsedUrl = url.parse(request.url, true);
-      const { language = 'en', userId, callSid } = parsedUrl.query;
+    // Start Chat Session
+    const chat = model.startChat({
+      history: [
+        { role: "user", parts: [{ text: systemPrompt }] },
+        { role: "model", parts: [{ text: "Understood. I am ready to help." }] }
+      ],
+    });
 
-      console.log('🎙️ VOICE AI WEBSOCKET - Connection Established:');
-      console.log('===========================================');
-      console.log(`Language: ${language}`);
-      console.log(`User ID: ${userId}`);
-      console.log(`Call SID: ${callSid}`);
-      console.log('===========================================');
+    // Helper: Generate Audio from Text (TTS)
+    async function speakResponse(text) {
+      if (!text) return;
+      console.log(`🗣️ Speaking: "${text}"`);
+      isSpeaking = true;
 
-      // Load subscriber knowledge base
-      let knowledgeBase = '';
       try {
-        const kbQuery = await pool.query(
-          'SELECT knowledge_data FROM subscriber_knowledge_base WHERE user_id = $1',
-          [userId]
-        );
-        if (kbQuery.rows.length > 0) {
-          const kbData = kbQuery.rows[0].knowledge_data || {};
-          knowledgeBase = kbData.languages?.[language]?.content ||
-            kbData.content ||
-            'You are a helpful real estate assistant.';
+        const request = {
+          input: { text: text },
+          voice: {
+            languageCode: 'en-US',
+            name: 'Kore', // Gemini TTS Voice
+            modelName: 'gemini-2.5-flash-tts' // Gemini TTS Model
+          },
+          audioConfig: {
+            audioEncoding: 'MULAW', // Native Twilio format
+            sampleRateHertz: 8000   // Native Twilio rate
+          },
+        };
+
+        const [response] = await ttsClient.synthesizeSpeech(request);
+        const audioContent = response.audioContent;
+
+        console.log(`🎵 TTS Audio generated, size: ${audioContent.length}`);
+
+        // Send to Twilio
+        ws.send(JSON.stringify({
+          event: 'media',
+          media: {
+            payload: audioContent.toString('base64')
+          }
+        }));
+
+        // Log to DB
+        pool.query(`
+          UPDATE ai_voice_call_logs
+          SET call_transcript = COALESCE(call_transcript, '') || '\nAI: ' || $1
+          WHERE user_id = $2 AND call_transcript LIKE '%' || $3 || '%'
+        `, [text, userId, callSid]).catch(e => console.error('DB Log Error:', e));
+
+      } catch (error) {
+        console.error('❌ TTS Error:', error);
+      } finally {
+        isSpeaking = false;
+      }
+    }
+
+    // Helper: Start STT Stream
+    function startRecognitionStream() {
+      recognizeStream = speechClient
+        .streamingRecognize({
+          config: {
+            encoding: 'MULAW',
+            sampleRateHertz: 8000,
+            languageCode: 'en-US',
+            model: 'phone_call',
+            useEnhanced: true,
+          },
+          interimResults: false, // We only want final results for now
+        })
+        .on('error', console.error)
+        .on('data', async (data) => {
+          if (data.results[0] && data.results[0].alternatives[0]) {
+            const transcript = data.results[0].alternatives[0].transcript;
+            console.log(`👂 Heard: "${transcript}"`);
+
+            // Log User Input
+            pool.query(`
+              UPDATE ai_voice_call_logs
+              SET call_transcript = COALESCE(call_transcript, '') || '\nCaller: ' || $1
+              WHERE user_id = $2 AND call_transcript LIKE '%' || $3 || '%'
+            `, [transcript, userId, callSid]).catch(e => console.error('DB Log Error:', e));
+
+            // Generate AI Response
+            try {
+              const result = await chat.sendMessage(transcript);
+              const responseText = result.response.text();
+              await speakResponse(responseText);
+            } catch (aiError) {
+              console.error('❌ LLM Error:', aiError);
+            }
+          }
+        });
+      console.log('👂 STT Stream Started');
+    }
+
+    // WebSocket Event Handlers
+    ws.on('message', (message) => {
+      try {
+        const data = JSON.parse(message);
+
+        if (data.event === 'start') {
+          console.log('✅ Twilio Stream Started');
+          startRecognitionStream();
+
+          // Initial Greeting
+          speakResponse("Hello! How can I help you with your real estate needs today?");
+
+        } else if (data.event === 'media') {
+          if (recognizeStream && data.media && data.media.payload) {
+            // Write audio to STT stream
+            recognizeStream.write(data.media.payload);
+          }
+        } else if (data.event === 'stop') {
+          console.log('🛑 Twilio Stream Stopped');
+          if (recognizeStream) recognizeStream.end();
         }
       } catch (error) {
-        console.error('❌ Error loading knowledge base:', error);
-        knowledgeBase = 'You are a helpful real estate assistant.';
+        console.error('❌ WebSocket Message Error:', error);
       }
+    });
 
-      // Initialize Gemini Live API session
-      const systemInstruction = `You are a helpful real estate assistant specializing in converting leads for adjacent businesses. Use this knowledge base context: ${knowledgeBase}
-
-Guidelines:
-- Be conversational and friendly
-- Keep responses under 100 words
-- Focus on qualifying leads and recommending relevant services/products
-- Ask targeted questions to understand buyer needs and timeline
-- Provide specific, actionable advice for home-related services
-- Emphasize urgency and next steps for conversions`;
-
-      const model = "gemini-2.0-flash-live-001";
-      const config = {
-        responseModalities: [Modality.AUDIO, Modality.TEXT],
-        speechConfig: {
-          voiceConfig: {
-            prebuiltVoiceConfig: {
-              voiceName: "Kore"
-            }
-          }
-        },
-        systemInstruction: systemInstruction
-      };
-
-      console.log('🎙️ Connecting to Gemini Live session...');
-      try {
-        session = await client.live.connect({
-          model: model,
-          config: config,
-          callbacks: {
-            onopen: () => {
-              console.log('✅ Gemini Live session connected successfully');
-            },
-            onmessage: (message) => {
-              try {
-                console.log('🎤 Gemini response received, type:', message.type || 'unknown');
-
-                // Log message structure for debugging
-                if (message.serverContent) {
-                  console.log('📝 Server content received:', JSON.stringify(message.serverContent, null, 2));
-                }
-                if (message.clientContent) {
-                  console.log('📝 Client content received:', JSON.stringify(message.clientContent, null, 2));
-                }
-
-                // Handle audio response from Gemini (supports both binary and inline formats)
-                let audioData = null;
-
-                if (message.data) {
-                  // Legacy format: raw binary audio
-                  audioData = Buffer.from(message.data);
-                } else if (message.serverContent?.modelTurn?.parts?.[0]?.inlineData) {
-                  // New format: JSON audio in modelTurn.parts[0].inlineData
-                  const inline = message.serverContent.modelTurn.parts[0].inlineData;
-                  if (inline.mimeType.startsWith('audio/')) {
-                    audioData = Buffer.from(inline.data, 'base64');
-                  }
-                }
-
-                if (audioData) {
-                  console.log('🔊 Gemini audio response received, size:', audioData.length);
-
-                  // Convert 16-bit PCM (24kHz) to 8kHz PCM, then to MULAW for Twilio
-                  // audioData is raw binary PCM data from Gemini (24kHz, 16-bit)
-                  const pcm24kBuffer = audioData;
-
-                  // Simple downsampling: 24kHz -> 8kHz (take every 3rd sample)
-                  const pcm8kBuffer = Buffer.alloc(Math.floor(pcm24kBuffer.length / 6) * 2); // 16-bit samples
-                  for (let i = 0, j = 0; i < pcm24kBuffer.length - 2; i += 6, j += 2) {
-                    // Take every 3rd 16-bit sample (24kHz / 3 = 8kHz)
-                    pcm8kBuffer[j] = pcm24kBuffer[i];
-                    pcm8kBuffer[j + 1] = pcm24kBuffer[i + 1];
-                  }
-
-                  const mulawAudioData = g711.ulawFromPCM(pcm8kBuffer);
-                  console.log('🔊 Resampled to 8kHz PCM size:', pcm8kBuffer.length, 'MULAW size:', mulawAudioData.length);
-
-                  // Send audio back to Twilio
-                  ws.send(JSON.stringify({
-                    event: 'media',
-                    media: {
-                      payload: mulawAudioData.toString('base64')
-                    }
-                  }));
-                  console.log('🔊 MULAW audio sent to Twilio successfully');
-                }
-
-                // Handle text transcripts (both user input and AI responses)
-                if (message.serverContent && message.serverContent.modelTurn) {
-                  const turn = message.serverContent.modelTurn;
-                  if (turn.parts && turn.parts[0] && turn.parts[0].text) {
-                    const transcript = turn.parts[0].text;
-                    console.log(`🎤 Gemini transcript: "${transcript}"`);
-
-                    // Log AI response to database
-                    pool.query(`
-                UPDATE ai_voice_call_logs
-                SET call_transcript = COALESCE(call_transcript, '') || '\nAI: ' || $1
-                WHERE user_id = $2 AND call_transcript LIKE '%' || $3 || '%'
-              `, [transcript, userId, callSid]).catch(err =>
-                      console.error('❌ Error logging AI response:', err)
-                    );
-                  }
-                }
-
-                // Handle user input transcripts
-                if (message.serverContent && message.serverContent.userTurn) {
-                  const turn = message.serverContent.userTurn;
-                  if (turn.parts && turn.parts[0] && turn.parts[0].text) {
-                    const userTranscript = turn.parts[0].text;
-                    console.log(`🎤 User said: "${userTranscript}"`);
-
-                    // Log user input to database
-                    pool.query(`
-                UPDATE ai_voice_call_logs
-                SET call_transcript = COALESCE(call_transcript, '') || '\nCaller: ' || $1
-                WHERE user_id = $2 AND call_transcript LIKE '%' || $3 || '%'
-              `, [userTranscript, userId, callSid]).catch(err =>
-                      console.error('❌ Error logging user input:', err)
-                    );
-                  }
-                }
-
-              } catch (error) {
-                console.error('❌ Error processing Gemini response:', error);
-              }
-            },
-            onerror: (error) => {
-              console.error('❌ Gemini session error:', error);
-            },
-            onclose: () => {
-              console.log('✅ Gemini session closed');
-            }
-          }
-        });
-
-        console.log('📝 Sending initial context message to Gemini...');
-        // Send initial context message to establish conversation
-        session.sendClientContent({
-          turns: [{
-            role: 'user',
-            parts: [{ text: 'Hello, I am calling about real estate services. Please respond naturally and help me with my real estate needs.' }]
-          }],
-          turnComplete: true
-        });
-        console.log('📝 Initial context message sent to Gemini');
-
-        // Send acknowledgment
-        ws.send(JSON.stringify({
-          event: 'connected',
-          message: 'Voice AI WebSocket connected and ready for conversation'
-        }));
-
-      } catch (sessionError) {
-        console.error('❌ Failed to connect to Gemini Live session:', sessionError);
-        ws.send(JSON.stringify({
-          event: 'error',
-          message: 'Failed to connect to voice AI service'
-        }));
-        ws.close();
-        return;
-      }
-
-      // Handle messages from Twilio
-      ws.on('message', async (message) => {
-        try {
-          console.log('🔍 RAW MESSAGE TYPE:', typeof message);
-          console.log('🔍 RAW MESSAGE:', message);
-
-          const data = JSON.parse(message);  // Try without .toString() first
-          console.log('✅ PARSED:', data.event);
-
-          if (data.event === 'start') {
-            console.log('🎙️ Audio stream started - Gemini Live API ready');
-            ws.send(JSON.stringify({
-              event: 'started',
-              message: 'Audio stream started successfully'
-            }));
-
-          } else if (data.event === 'media') {
-            // Receive audio data from Twilio and send to Gemini
-            console.log('🎵 Media event received, payload length:', data.media?.payload?.length || 0);
-            if (data.media && data.media.payload) {
-              try {
-                // Convert base64 MULAW audio to buffer
-                const mulawBuffer = Buffer.from(data.media.payload, 'base64');
-                console.log('🎵 Received MULAW buffer, size:', mulawBuffer.length);
-
-                // Convert MULAW to PCM using g711 (returns Int16Array)
-                const pcm8k = g711.ulawToPCM(mulawBuffer); // Returns Int16Array
-                console.log('🎵 Converted MULAW to PCM (8kHz), size:', pcm8k.length, 'type:', pcm8k.constructor.name);
-
-                // HIGH QUALITY UPSAMPLING: wave-resampler (Cubic/Sinc interpolation)
-                // This creates a much smoother wave than linear interpolation
-                const pcm16kFloat = waveResampler.resample(
-                  pcm8k,                     // Input: Int16Array (16-bit PCM)
-                  8000,                      // From sample rate
-                  16000                      // To sample rate
-                );
-
-                // Convert Float array back to Int16Array + Apply Volume Boost
-                const GAIN = 4; // 4x Volume Boost
-                const pcm16k = new Int16Array(pcm16kFloat.length);
-
-                for (let i = 0; i < pcm16kFloat.length; i++) {
-                  // Apply gain and clamp to 16-bit range (-32768 to 32767)
-                  const sample = pcm16kFloat[i] * GAIN;
-                  pcm16k[i] = Math.max(-32768, Math.min(32767, sample));
-                }
-
-                console.log('🔄 Wave-Resampler complete, 16kHz buffer size:', pcm16k.length);
-
-                // CRITICAL: Create Buffer correctly to avoid data corruption
-                // DO NOT use Buffer.from(pcm16k) -> This truncates to 8-bit!
-                const pcm16kBuffer = Buffer.from(pcm16k.buffer);
-                console.log('🔄 Created Buffer from 16kHz array, size:', pcm16kBuffer.length);
-
-                // Encode to base64
-                const base64Pcm = pcm16kBuffer.toString('base64');
-                console.log('🔄 Encoded to base64, length:', base64Pcm.length);
-
-                // Send to Gemini at 16kHz (required for VAD)
-                if (session) {
-                  console.log('🔍 About to call sendRealtimeInput, session exists:', !!session);
-                  session.sendRealtimeInput({
-                    audio: {
-                      data: base64Pcm,
-                      mimeType: 'audio/pcm;rate=16000'  // 16kHz sample rate for Gemini VAD
-                    }
-                  });
-                  console.log('✅ sendRealtimeInput called successfully');
-                  console.log('🎵 Audio sent to Gemini Live API (16kHz PCM - upsampled from 8kHz)');
-                } else {
-                  console.error('❌ session is null - cannot send audio!');
-                }
-
-              } catch (geminiError) {
-                console.error('❌ Gemini processing error:', geminiError);
-              }
-            } else {
-              console.log('🎵 Media event ignored - missing payload');
-            }
-
-          } else if (data.event === 'stop') {
-            console.log('🎙️ Audio stream stopped');
-            // Close Gemini session
-            try {
-              session.close();
-              console.log('✅ Gemini session closed');
-            } catch (error) {
-              console.error('❌ Error closing Gemini session:', error);
-            }
-          }
-
-        } catch (error) {
-          console.error('❌ PARSE ERROR:', error.message);
-          console.error('❌ RAW:', message);
-          console.error('❌ TYPE:', typeof message);
-
-          // Try alternate parsing
-          try {
-            const data = JSON.parse(message.toString());
-            console.log('✅ PARSED WITH toString():', data.event);
-          } catch (e2) {
-            console.error('❌ STILL FAILED:', e2.message);
-          }
-        }
-      });
-
-      ws.on('close', () => {
-        console.log('🔌 WebSocket closed');
-        // Clean up Gemini session
-        try {
-          if (session) {
-            session.close();
-          }
-        } catch (error) {
-          console.error('❌ Error closing Gemini session:', error);
-        }
-      });
-
-      ws.on('error', (error) => {
-        console.error('❌ WebSocket error:', error);
-        // Clean up Gemini session
-        try {
-          if (session) {
-            session.close();
-          }
-        } catch (cleanupError) {
-          console.error('❌ Error closing Gemini session on WebSocket error:', cleanupError);
-        }
-      });
-
-    } catch (error) {
-      console.error('❌ Error in Voice AI WebSocket handler:', error);
-      ws.close();
-    }
+    ws.on('close', () => {
+      console.log('🔌 WebSocket Closed');
+      if (recognizeStream) recognizeStream.end();
+    });
   }
 
   // Handle WebSocket upgrades
