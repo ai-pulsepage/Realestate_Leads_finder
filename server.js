@@ -242,7 +242,15 @@ Guidelines:
             },
             onmessage: (message) => {
         try {
-          console.log('🎤 Gemini response received');
+          console.log('🎤 Gemini response received, type:', message.type || 'unknown');
+
+          // Log message structure for debugging
+          if (message.serverContent) {
+            console.log('📝 Server content received:', JSON.stringify(message.serverContent, null, 2));
+          }
+          if (message.clientContent) {
+            console.log('📝 Client content received:', JSON.stringify(message.clientContent, null, 2));
+          }
 
           // Handle audio response from Gemini
           if (message.data) {
@@ -378,15 +386,23 @@ Guidelines:
                 const pcm8kBuffer = g711.ulawToPCM(mulawBuffer);
                 console.log('🎵 Converted MULAW to 16-bit PCM (8kHz), size:', pcm8kBuffer.length);
 
-                // Upsample from 8kHz to 16kHz PCM for Gemini
-                // Simple linear interpolation: duplicate each sample
-                const pcm16kBuffer = Buffer.alloc(pcm8kBuffer.length * 2);
-                for (let i = 0, j = 0; i < pcm8kBuffer.length; i += 2, j += 4) {
-                  // Copy each 16-bit sample and duplicate it
-                  pcm16kBuffer[j] = pcm8kBuffer[i];
-                  pcm16kBuffer[j + 1] = pcm8kBuffer[i + 1];
-                  pcm16kBuffer[j + 2] = pcm8kBuffer[i];
-                  pcm16kBuffer[j + 3] = pcm8kBuffer[i + 1];
+                // Upsample from 8kHz to 16kHz PCM for Gemini using linear interpolation
+                // 8kHz → 16kHz requires 2x samples, using proper interpolation instead of duplication
+                const pcm16kBuffer = Buffer.alloc(Math.floor(pcm8kBuffer.length * 2));
+                for (let i = 0, j = 0; i < pcm8kBuffer.length - 2; i += 2, j += 6) {
+                  // Get current and next 16-bit samples
+                  const sample1 = pcm8kBuffer.readInt16LE(i);
+                  const sample2 = pcm8kBuffer.readInt16LE(i + 2);
+
+                  // Write sample1
+                  pcm16kBuffer.writeInt16LE(sample1, j);
+
+                  // Interpolate between sample1 and sample2
+                  const interpolated = Math.round((sample1 + sample2) / 2);
+                  pcm16kBuffer.writeInt16LE(interpolated, j + 2);
+
+                  // Write sample2
+                  pcm16kBuffer.writeInt16LE(sample2, j + 4);
                 }
                 console.log('🎵 Upsampled to 16-bit PCM (16kHz), size:', pcm16kBuffer.length);
 
