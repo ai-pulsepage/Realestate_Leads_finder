@@ -407,13 +407,19 @@ Guidelines:
                 console.log('📏 Created 16kHz buffer, target size:', pcm16k.length);
 
                 // Linear Interpolation / Duplication: duplicate each 8kHz sample
-                // Linear Interpolation (Smoothing)
+                // Linear Interpolation (Smoothing) + Volume Boost
+                const GAIN = 4; // 4x Volume Boost
+
                 for (let i = 0; i < pcm8k.length; i++) {
                   const current = pcm8k[i];
                   const next = (i < pcm8k.length - 1) ? pcm8k[i + 1] : current;
 
-                  pcm16k[i * 2] = current;           // Original sample
-                  pcm16k[i * 2 + 1] = (current + next) / 2; // Average (Smoothed)
+                  // Apply gain and clamp to 16-bit range (-32768 to 32767)
+                  const sample1 = Math.max(-32768, Math.min(32767, current * GAIN));
+                  const sample2 = Math.max(-32768, Math.min(32767, ((current + next) / 2) * GAIN));
+
+                  pcm16k[i * 2] = sample1;           // Original sample (boosted)
+                  pcm16k[i * 2 + 1] = sample2;       // Smoothed sample (boosted)
                 }
                 console.log('🔄 Upsampling complete, 16kHz buffer size:', pcm16k.length);
 
