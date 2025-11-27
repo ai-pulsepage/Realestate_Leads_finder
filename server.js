@@ -171,7 +171,6 @@ try {
       // Load Gemini Live API and audio conversion
       const { GoogleGenAI, Modality } = require('@google/genai');
       const g711 = require('g711');
-      const waveResampler = require('wave-resampler');
       const client = new GoogleGenAI({
         apiKey: process.env.GEMINI_API_KEY,
         httpOptions: { apiVersion: 'v1alpha' }
@@ -387,38 +386,24 @@ Guidelines:
                 const pcm8k = g711.ulawToPCM(mulawBuffer); // Returns Int16Array
                 console.log('🎵 Converted MULAW to PCM (8kHz), size:', pcm8k.length, 'type:', pcm8k.constructor.name);
 
-                // Professional resampling 8kHz → 16kHz using wave-resampler
-                const pcm16kFloat = waveResampler.resample(
-                  Buffer.from(pcm8k.buffer), // Input buffer (16-bit PCM)
-                  8000,                      // From sample rate
-                  16000                     // To sample rate
-                );
-
-                // Convert Float64Array to 16-bit PCM Int16Array
-                const pcm16kInt = new Int16Array(pcm16kFloat.length);
-                for (let i = 0; i < pcm16kFloat.length; i++) {
-                  // Clamp to 16-bit range and convert to integer
-                  pcm16kInt[i] = Math.max(-32768, Math.min(32767, Math.round(pcm16kFloat[i])));
-                }
-
-                // Convert Int16Array to Buffer for base64 encoding
-                const pcm16kBuffer = Buffer.from(pcm16kInt.buffer);
-                console.log('🎵 Upsampled to PCM (16kHz), size:', pcm16kBuffer.length);
+                // Send 8kHz PCM directly to Gemini (officially supported)
+                const pcm8kBuffer = Buffer.from(pcm8k.buffer);
+                console.log('🎵 Sending PCM (8kHz) directly, size:', pcm8kBuffer.length);
 
                 // Encode to base64
-                const base64Pcm = pcm16kBuffer.toString('base64');
+                const base64Pcm = pcm8kBuffer.toString('base64');
 
-                // Send to Gemini at 16kHz
+                // Send to Gemini at 8kHz (Gemini will resample internally)
                 if (session) {
                   console.log('🔍 About to call sendRealtimeInput, session exists:', !!session);
                   session.sendRealtimeInput({
                     audio: {
                       data: base64Pcm,
-                      mimeType: 'audio/pcm;rate=16000'  // Matches actual 16kHz sample rate
+                      mimeType: 'audio/pcm;rate=8000'  // 8kHz sample rate
                     }
                   });
                   console.log('✅ sendRealtimeInput called successfully');
-                  console.log('🎵 Audio sent to Gemini Live API (16kHz PCM)');
+                  console.log('🎵 Audio sent to Gemini Live API (8kHz PCM)');
                 } else {
                   console.error('❌ session is null - cannot send audio!');
                 }
