@@ -251,22 +251,19 @@ Guidelines:
         const request = {
           input: { text: text },
           voice: {
-            languageCode: 'en-US',
-            name: 'Kore', // Gemini TTS Voice
-            model: 'gemini-2.5-flash-tts' // Try 'model' instead of 'modelName' for v1beta1? Or both?
-            // Note: The API field is 'model' in some contexts, 'modelName' in others.
-            // Let's try passing it as 'model' first based on common Google patterns, 
-            // but keep 'modelName' if that fails. Actually, let's check the proto.
-            // For now, I will pass `model` as that is often the field name in beta.
+            languageCode: 'en-us', // Lowercase as per docs
+            name: 'Kore',
+            // The error "This voice requires a model name" implies it's missing.
+            // Node.js client usually maps camelCase to snake_case.
+            modelName: 'gemini-2.5-flash-tts',
+            // Adding snake_case too just in case the beta client passes it through
+            model_name: 'gemini-2.5-flash-tts'
           },
           audioConfig: {
             audioEncoding: 'MULAW', // Native Twilio format
             sampleRateHertz: 8000   // Native Twilio rate
           },
         };
-
-        // Add modelName as well just in case
-        request.voice.modelName = 'gemini-2.5-flash-tts';
 
         console.log('📝 TTS Request:', JSON.stringify(request, null, 2));
 
