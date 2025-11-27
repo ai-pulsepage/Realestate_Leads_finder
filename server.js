@@ -262,7 +262,9 @@ Guidelines:
           voice: {
             languageCode: 'en-US',
             name: 'Kore',
-            model: 'gemini-2.5-flash-tts' // REST API should accept this
+            // The API rejected 'model', so it must be 'model_name' (snake_case)
+            // This matches the gRPC field 'modelName'.
+            model_name: 'gemini-2.5-flash-tts'
           },
           audioConfig: {
             audioEncoding: 'MULAW',
