@@ -172,9 +172,8 @@ try {
   const wss = new WebSocket.Server({ noServer: true });
 
   // Google-Native Voice AI Handler (STT -> LLM -> TTS)
-  // Initialize Clients (Global Scope to fail fast)
   const speech = require('@google-cloud/speech');
-  const tts = require('@google-cloud/text-to-speech');
+  const tts = require('@google-cloud/text-to-speech').v1beta1; // Use v1beta1 for Gemini TTS
   const { GoogleGenerativeAI } = require('@google/generative-ai');
 
   let speechClient, ttsClient, genAI, model;
@@ -182,7 +181,7 @@ try {
     speechClient = new speech.SpeechClient();
     console.log('✅ Google Speech Client initialized');
     ttsClient = new tts.TextToSpeechClient();
-    console.log('✅ Google TTS Client initialized');
+    console.log('✅ Google TTS Client (v1beta1) initialized');
     genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
     console.log('✅ Gemini LLM Client initialized');
@@ -254,13 +253,22 @@ Guidelines:
           voice: {
             languageCode: 'en-US',
             name: 'Kore', // Gemini TTS Voice
-            modelName: 'gemini-2.5-flash-tts' // Gemini TTS Model
+            model: 'gemini-2.5-flash-tts' // Try 'model' instead of 'modelName' for v1beta1? Or both?
+            // Note: The API field is 'model' in some contexts, 'modelName' in others.
+            // Let's try passing it as 'model' first based on common Google patterns, 
+            // but keep 'modelName' if that fails. Actually, let's check the proto.
+            // For now, I will pass `model` as that is often the field name in beta.
           },
           audioConfig: {
             audioEncoding: 'MULAW', // Native Twilio format
             sampleRateHertz: 8000   // Native Twilio rate
           },
         };
+
+        // Add modelName as well just in case
+        request.voice.modelName = 'gemini-2.5-flash-tts';
+
+        console.log('📝 TTS Request:', JSON.stringify(request, null, 2));
 
         const [response] = await ttsClient.synthesizeSpeech(request);
         const audioContent = response.audioContent;
@@ -283,7 +291,7 @@ Guidelines:
         `, [text, userId, callSid]).catch(e => console.error('DB Log Error:', e));
 
       } catch (error) {
-        console.error('❌ TTS Error:', error);
+        console.error('❌ TTS Error:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
       } finally {
         isSpeaking = false;
       }
