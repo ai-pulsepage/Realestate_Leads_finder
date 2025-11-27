@@ -403,7 +403,7 @@ Guidelines:
                 // HIGH QUALITY UPSAMPLING: wave-resampler (Cubic/Sinc interpolation)
                 // This creates a much smoother wave than linear interpolation
                 const pcm16kFloat = waveResampler.resample(
-                  Buffer.from(pcm8k.buffer), // Input buffer (16-bit PCM)
+                  pcm8k,                     // Input: Int16Array (16-bit PCM)
                   8000,                      // From sample rate
                   16000                      // To sample rate
                 );
