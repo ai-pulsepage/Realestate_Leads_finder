@@ -251,17 +251,15 @@ Guidelines:
         const request = {
           input: { text: text },
           voice: {
-            languageCode: 'en-us', // Lowercase as per docs
+            languageCode: 'en-US',
             name: 'Kore',
-            // The error "This voice requires a model name" implies it's missing.
-            // Node.js client usually maps camelCase to snake_case.
-            modelName: 'gemini-2.5-flash-tts',
-            // Adding snake_case too just in case the beta client passes it through
-            model_name: 'gemini-2.5-flash-tts'
+            // The error explicitly says "requires a model". 
+            // In the v1beta1 proto, the field is likely just 'model'.
+            model: 'gemini-2.5-flash-tts'
           },
           audioConfig: {
-            audioEncoding: 'MULAW', // Native Twilio format
-            sampleRateHertz: 8000   // Native Twilio rate
+            audioEncoding: 'MULAW',
+            sampleRateHertz: 8000
           },
         };
 
