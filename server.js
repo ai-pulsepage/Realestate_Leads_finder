@@ -171,6 +171,7 @@ try {
       // Load Gemini Live API and audio conversion
       const { GoogleGenAI, Modality } = require('@google/genai');
       const g711 = require('g711');
+      const waveResampler = require('wave-resampler');
       const client = new GoogleGenAI({
         apiKey: process.env.GEMINI_API_KEY,
         httpOptions: { apiVersion: 'v1alpha' }
@@ -399,29 +400,25 @@ Guidelines:
                 const pcm8k = g711.ulawToPCM(mulawBuffer); // Returns Int16Array
                 console.log('🎵 Converted MULAW to PCM (8kHz), size:', pcm8k.length, 'type:', pcm8k.constructor.name);
 
-                // UPSAMPLE: Convert 8kHz PCM to 16kHz PCM for Gemini VAD compatibility
-                console.log('🔄 Starting 8kHz → 16kHz upsampling...');
+                // HIGH QUALITY UPSAMPLING: wave-resampler (Cubic/Sinc interpolation)
+                // This creates a much smoother wave than linear interpolation
+                const pcm16kFloat = waveResampler.resample(
+                  Buffer.from(pcm8k.buffer), // Input buffer (16-bit PCM)
+                  8000,                      // From sample rate
+                  16000                      // To sample rate
+                );
 
-                // Create target buffer (double size for 2x upsampling)
-                const pcm16k = new Int16Array(pcm8k.length * 2);
-                console.log('📏 Created 16kHz buffer, target size:', pcm16k.length);
-
-                // Linear Interpolation / Duplication: duplicate each 8kHz sample
-                // Linear Interpolation (Smoothing) + Volume Boost
+                // Convert Float array back to Int16Array + Apply Volume Boost
                 const GAIN = 4; // 4x Volume Boost
+                const pcm16k = new Int16Array(pcm16kFloat.length);
 
-                for (let i = 0; i < pcm8k.length; i++) {
-                  const current = pcm8k[i];
-                  const next = (i < pcm8k.length - 1) ? pcm8k[i + 1] : current;
-
+                for (let i = 0; i < pcm16kFloat.length; i++) {
                   // Apply gain and clamp to 16-bit range (-32768 to 32767)
-                  const sample1 = Math.max(-32768, Math.min(32767, current * GAIN));
-                  const sample2 = Math.max(-32768, Math.min(32767, ((current + next) / 2) * GAIN));
-
-                  pcm16k[i * 2] = sample1;           // Original sample (boosted)
-                  pcm16k[i * 2 + 1] = sample2;       // Smoothed sample (boosted)
+                  const sample = pcm16kFloat[i] * GAIN;
+                  pcm16k[i] = Math.max(-32768, Math.min(32767, sample));
                 }
-                console.log('🔄 Upsampling complete, 16kHz buffer size:', pcm16k.length);
+
+                console.log('🔄 Wave-Resampler complete, 16kHz buffer size:', pcm16k.length);
 
                 // CRITICAL: Create Buffer correctly to avoid data corruption
                 // DO NOT use Buffer.from(pcm16k) -> This truncates to 8-bit!
