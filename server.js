@@ -171,6 +171,7 @@ try {
       // Load Gemini Live API and audio conversion
       const { GoogleGenAI, Modality } = require('@google/genai');
       const g711 = require('g711');
+      const waveResampler = require('wave-resampler');
       const client = new GoogleGenAI({
         apiKey: process.env.GEMINI_API_KEY,
         httpOptions: { apiVersion: 'v1alpha' }
@@ -386,18 +387,22 @@ Guidelines:
                 const pcm8k = g711.ulawToPCM(mulawBuffer); // Returns Int16Array
                 console.log('🎵 Converted MULAW to PCM (8kHz), size:', pcm8k.length, 'type:', pcm8k.constructor.name);
 
-                // Upsample 8kHz → 16kHz by duplicating samples (simple approach)
-                // Create Int16Array of double length for 16kHz
-                const pcm16k = new Int16Array(pcm8k.length * 2);
+                // Professional resampling 8kHz → 16kHz using wave-resampler
+                const pcm16kFloat = waveResampler.resample(
+                  Buffer.from(pcm8k.buffer), // Input buffer (16-bit PCM)
+                  8000,                      // From sample rate
+                  16000                     // To sample rate
+                );
 
-                // Duplicate each sample to double the sample rate
-                for (let i = 0; i < pcm8k.length; i++) {
-                  pcm16k[i * 2] = pcm8k[i];     // Original sample
-                  pcm16k[i * 2 + 1] = pcm8k[i]; // Duplicate for 16kHz
+                // Convert Float64Array to 16-bit PCM Int16Array
+                const pcm16kInt = new Int16Array(pcm16kFloat.length);
+                for (let i = 0; i < pcm16kFloat.length; i++) {
+                  // Clamp to 16-bit range and convert to integer
+                  pcm16kInt[i] = Math.max(-32768, Math.min(32767, Math.round(pcm16kFloat[i])));
                 }
 
                 // Convert Int16Array to Buffer for base64 encoding
-                const pcm16kBuffer = Buffer.from(pcm16k.buffer);
+                const pcm16kBuffer = Buffer.from(pcm16kInt.buffer);
                 console.log('🎵 Upsampled to PCM (16kHz), size:', pcm16kBuffer.length);
 
                 // Encode to base64
