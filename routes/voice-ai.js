@@ -289,10 +289,11 @@ router.post('/language-selected', async (req, res) => {
     const voiceMap = { en: 'Polly.Joanna', es: 'Polly.Lupe' };
     const langMap = { en: 'en-US', es: 'es-US' };
 
-    twiml.say({
-      voice: voiceMap[language],
-      language: langMap[language]
-    }, cleanGreeting);
+    // REMOVED: Redundant greeting. The AI will greet the user once connected.
+    // twiml.say({
+    //   voice: voiceMap[language],
+    //   language: langMap[language]
+    // }, cleanGreeting);
 
     // Connect to WebSocket for real-time conversation
     const host = req.get('host');

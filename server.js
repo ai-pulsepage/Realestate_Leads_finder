@@ -251,6 +251,9 @@ Guidelines:
     }
 
     // Helper: Start STT Stream
+    let transcriptBuffer = '';
+    let silenceTimer = null;
+
     function startRecognitionStream() {
       recognizeStream = speechClient
         .streamingRecognize({
@@ -267,23 +270,44 @@ Guidelines:
         .on('data', async (data) => {
           if (data.results[0] && data.results[0].alternatives[0]) {
             const transcript = data.results[0].alternatives[0].transcript;
-            console.log(`👂 Heard: "${transcript}"`);
 
-            // Log User Input
-            pool.query(`
-              UPDATE ai_voice_call_logs
-              SET call_transcript = COALESCE(call_transcript, '') || '\nCaller: ' || $1
-              WHERE user_id = $2 AND call_transcript LIKE '%' || $3 || '%'
-            `, [transcript, userId, callSid]).catch(e => console.error('DB Log Error:', e));
-
-            // Generate AI Response
-            try {
-              const result = await chat.sendMessage(transcript);
-              const responseText = result.response.text();
-              await speakResponse(responseText);
-            } catch (aiError) {
-              console.error('❌ LLM Error:', aiError);
+            // ECHO CANCELLATION: Ignore input if AI is speaking
+            if (isSpeaking) {
+              console.log('🙊 Ignoring input (AI is speaking)');
+              return;
             }
+
+            console.log(`👂 Partial Heard: "${transcript}"`);
+
+            // DEBOUNCE / SILENCE DETECTION
+            // Buffer the transcript and wait for silence before responding.
+            transcriptBuffer += ' ' + transcript;
+
+            if (silenceTimer) clearTimeout(silenceTimer);
+
+            silenceTimer = setTimeout(async () => {
+              const finalTranscript = transcriptBuffer.trim();
+              if (!finalTranscript) return;
+
+              console.log(`✅ Final User Input (after silence): "${finalTranscript}"`);
+              transcriptBuffer = ''; // Clear buffer
+
+              // Log User Input
+              pool.query(`
+                  UPDATE ai_voice_call_logs
+                  SET call_transcript = COALESCE(call_transcript, '') || '\nCaller: ' || $1
+                  WHERE user_id = $2 AND call_transcript LIKE '%' || $3 || '%'
+                `, [finalTranscript, userId, callSid]).catch(e => console.error('DB Log Error:', e));
+
+              // Generate AI Response
+              try {
+                const result = await chat.sendMessage(finalTranscript);
+                const responseText = result.response.text();
+                await speakResponse(responseText);
+              } catch (aiError) {
+                console.error('❌ LLM Error:', aiError);
+              }
+            }, 800); // Wait 800ms for silence
           }
         });
       console.log('👂 STT Stream Started');
