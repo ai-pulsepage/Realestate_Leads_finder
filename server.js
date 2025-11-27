@@ -250,65 +250,6 @@ Guidelines:
       return;
     }
 
-    // Helper: Generate Audio from Text (TTS)
-    async function speakResponse(text) {
-      if (!text) return;
-      console.log(`🗣️ Speaking: "${text}"`);
-      isSpeaking = true;
-
-      try {
-        const requestBody = {
-          input: { text: text },
-          voice: {
-            languageCode: 'en-US',
-            name: 'Kore',
-            // The API rejected 'model', so it must be 'model_name' (snake_case)
-            // This matches the gRPC field 'modelName'.
-            model_name: 'gemini-2.5-flash-tts'
-          },
-          audioConfig: {
-            audioEncoding: 'MULAW',
-            sampleRateHertz: 8000
-          },
-        };
-
-        console.log('📝 TTS Request (REST):', JSON.stringify(requestBody, null, 2));
-
-        // Use REST Client
-        const response = await ttsRestClient.text.synthesize({
-          requestBody: requestBody
-        });
-
-        const audioContent = response.data.audioContent;
-
-        if (!audioContent) {
-          throw new Error('No audio content returned from TTS');
-        }
-
-        console.log(`🎵 TTS Audio generated, size: ${audioContent.length}`);
-
-        // Send to Twilio
-        ws.send(JSON.stringify({
-          event: 'media',
-          media: {
-            payload: audioContent // REST API returns base64 string directly usually, or we might need to check
-          }
-        }));
-
-        // Log to DB
-        pool.query(`
-          UPDATE ai_voice_call_logs
-          SET call_transcript = COALESCE(call_transcript, '') || '\nAI: ' || $1
-          WHERE user_id = $2 AND call_transcript LIKE '%' || $3 || '%'
-        `, [text, userId, callSid]).catch(e => console.error('DB Log Error:', e));
-
-      } catch (error) {
-        console.error('❌ TTS Error:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
-      } finally {
-        isSpeaking = false;
-      }
-    }
-
     // Helper: Start STT Stream
     function startRecognitionStream() {
       recognizeStream = speechClient
@@ -349,12 +290,17 @@ Guidelines:
     }
 
     // WebSocket Event Handlers
+    let streamSid = null;
+
     ws.on('message', (message) => {
       try {
         const data = JSON.parse(message);
 
         if (data.event === 'start') {
           console.log('✅ Twilio Stream Started');
+          streamSid = data.start.streamSid;
+          console.log('StreamSid:', streamSid);
+
           startRecognitionStream();
 
           // Initial Greeting
@@ -373,6 +319,71 @@ Guidelines:
         console.error('❌ WebSocket Message Error:', error);
       }
     });
+
+    // Helper: Generate Audio from Text (TTS)
+    // Moved inside to access streamSid
+    async function speakResponse(text) {
+      if (!text) return;
+      console.log(`🗣️ Speaking: "${text}"`);
+      isSpeaking = true;
+
+      try {
+        const requestBody = {
+          input: { text: text },
+          voice: {
+            languageCode: 'en-US',
+            name: 'Kore',
+            // The API rejected 'model', so it must be 'model_name' (snake_case)
+            // This matches the gRPC field 'modelName'.
+            model_name: 'gemini-2.5-flash-tts'
+          },
+          audioConfig: {
+            audioEncoding: 'MULAW',
+            sampleRateHertz: 8000
+          },
+        };
+
+        console.log('📝 TTS Request (REST):', JSON.stringify(requestBody, null, 2));
+
+        // Use REST Client
+        const response = await ttsRestClient.text.synthesize({
+          requestBody: requestBody
+        });
+
+        const audioContent = response.data.audioContent;
+
+        if (!audioContent) {
+          throw new Error('No audio content returned from TTS');
+        }
+
+        console.log(`🎵 TTS Audio generated, size: ${audioContent.length}`);
+
+        // Send to Twilio
+        if (streamSid) {
+          ws.send(JSON.stringify({
+            event: 'media',
+            streamSid: streamSid,
+            media: {
+              payload: audioContent
+            }
+          }));
+        } else {
+          console.error('❌ Cannot send audio: StreamSid not yet received');
+        }
+
+        // Log to DB
+        pool.query(`
+          UPDATE ai_voice_call_logs
+          SET call_transcript = COALESCE(call_transcript, '') || '\nAI: ' || $1
+          WHERE user_id = $2 AND call_transcript LIKE '%' || $3 || '%'
+        `, [text, userId, callSid]).catch(e => console.error('DB Log Error:', e));
+
+      } catch (error) {
+        console.error('❌ TTS Error:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+      } finally {
+        isSpeaking = false;
+      }
+    }
 
     ws.on('close', () => {
       console.log('🔌 WebSocket Closed');
