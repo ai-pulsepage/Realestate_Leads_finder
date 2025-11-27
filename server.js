@@ -171,17 +171,25 @@ try {
 
   const wss = new WebSocket.Server({ noServer: true });
 
-  // Google-Native Voice AI Handler (STT -> LLM -> TTS)
+  // Initialize Clients (Global Scope to fail fast)
   const speech = require('@google-cloud/speech');
-  const tts = require('@google-cloud/text-to-speech').v1beta1; // Use v1beta1 for Gemini TTS
+  // const tts = require('@google-cloud/text-to-speech').v1beta1; // gRPC client (Removed)
+  const { google } = require('googleapis'); // REST client
   const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-  let speechClient, ttsClient, genAI, model;
+  let speechClient, ttsRestClient, genAI, model, authClient;
   try {
     speechClient = new speech.SpeechClient();
     console.log('✅ Google Speech Client initialized');
-    ttsClient = new tts.TextToSpeechClient();
-    console.log('✅ Google TTS Client (v1beta1) initialized');
+
+    // Initialize REST TTS Client
+    const auth = new google.auth.GoogleAuth({
+      scopes: ['https://www.googleapis.com/auth/cloud-platform']
+    });
+    authClient = auth;
+    ttsRestClient = google.texttospeech({ version: 'v1beta1', auth: authClient });
+    console.log('✅ Google TTS REST Client (v1beta1) initialized');
+
     genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
     console.log('✅ Gemini LLM Client initialized');
@@ -196,6 +204,7 @@ try {
 
     console.log('🎙️ Initializing Google-Native Voice AI Session...');
 
+    // ... (Keep existing setup code) ...
     // Extract query parameters
     const url = require('url');
     const parsedUrl = url.parse(request.url, true);
@@ -248,14 +257,12 @@ Guidelines:
       isSpeaking = true;
 
       try {
-        const request = {
+        const requestBody = {
           input: { text: text },
           voice: {
             languageCode: 'en-US',
             name: 'Kore',
-            // The error explicitly says "requires a model". 
-            // In the v1beta1 proto, the field is likely just 'model'.
-            model: 'gemini-2.5-flash-tts'
+            model: 'gemini-2.5-flash-tts' // REST API should accept this
           },
           audioConfig: {
             audioEncoding: 'MULAW',
@@ -263,10 +270,18 @@ Guidelines:
           },
         };
 
-        console.log('📝 TTS Request:', JSON.stringify(request, null, 2));
+        console.log('📝 TTS Request (REST):', JSON.stringify(requestBody, null, 2));
 
-        const [response] = await ttsClient.synthesizeSpeech(request);
-        const audioContent = response.audioContent;
+        // Use REST Client
+        const response = await ttsRestClient.text.synthesize({
+          requestBody: requestBody
+        });
+
+        const audioContent = response.data.audioContent;
+
+        if (!audioContent) {
+          throw new Error('No audio content returned from TTS');
+        }
 
         console.log(`🎵 TTS Audio generated, size: ${audioContent.length}`);
 
@@ -274,7 +289,7 @@ Guidelines:
         ws.send(JSON.stringify({
           event: 'media',
           media: {
-            payload: audioContent.toString('base64')
+            payload: audioContent // REST API returns base64 string directly usually, or we might need to check
           }
         }));
 
