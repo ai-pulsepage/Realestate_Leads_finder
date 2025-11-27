@@ -8,6 +8,14 @@ console.log('PORT:', process.env.PORT);
 console.log('Environment:', process.env.NODE_ENV || 'development');
 console.log('DATABASE_URL set:', process.env.DATABASE_URL ? 'Yes' : 'No');
 
+process.on('uncaughtException', (err) => {
+  console.error('❌ UNCAUGHT EXCEPTION:', err);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('❌ UNHANDLED REJECTION:', reason);
+});
+
 try {
   console.log('Loading express...');
   const express = require('express');
@@ -164,17 +172,25 @@ try {
   const wss = new WebSocket.Server({ noServer: true });
 
   // Google-Native Voice AI Handler (STT -> LLM -> TTS)
+  // Initialize Clients (Global Scope to fail fast)
+  const speech = require('@google-cloud/speech');
+  const tts = require('@google-cloud/text-to-speech');
+  const { GoogleGenerativeAI } = require('@google/generative-ai');
+
+  let speechClient, ttsClient, genAI, model;
+  try {
+    speechClient = new speech.SpeechClient();
+    console.log('✅ Google Speech Client initialized');
+    ttsClient = new tts.TextToSpeechClient();
+    console.log('✅ Google TTS Client initialized');
+    genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    console.log('✅ Gemini LLM Client initialized');
+  } catch (err) {
+    console.error('❌ FATAL: Failed to initialize Google Clients:', err);
+  }
+
   async function handleVoiceAIWebSocket(ws, request, pool) {
-    // Initialize Clients
-    const speech = require('@google-cloud/speech');
-    const tts = require('@google-cloud/text-to-speech');
-    const { GoogleGenerativeAI } = require('@google/generative-ai');
-
-    const speechClient = new speech.SpeechClient();
-    const ttsClient = new tts.TextToSpeechClient();
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-
     let recognizeStream = null;
     let isSpeaking = false;
     let conversationHistory = [];
@@ -211,12 +227,20 @@ Guidelines:
 - Do not use markdown or emojis (this is for voice).`;
 
     // Start Chat Session
-    const chat = model.startChat({
-      history: [
-        { role: "user", parts: [{ text: systemPrompt }] },
-        { role: "model", parts: [{ text: "Understood. I am ready to help." }] }
-      ],
-    });
+    let chat;
+    try {
+      chat = model.startChat({
+        history: [
+          { role: "user", parts: [{ text: systemPrompt }] },
+          { role: "model", parts: [{ text: "Understood. I am ready to help." }] }
+        ],
+      });
+      console.log('✅ Gemini Chat Session Started');
+    } catch (chatError) {
+      console.error('❌ Failed to start Gemini Chat:', chatError);
+      ws.close();
+      return;
+    }
 
     // Helper: Generate Audio from Text (TTS)
     async function speakResponse(text) {
