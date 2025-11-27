@@ -112,7 +112,7 @@ Before starting implementation, verify:
 
 - [ ] Can access GitHub repo: `ai-pulsepage/Realestate_Leads_finder`
 - [ ] Can connect to database: `psql "postgresql://postgres:Admin%401234@172.27.64.3:5432/real_estate_leads?sslmode=no-verify"`
-- [ ] Cloud Run service running: https://real-estate-leads-api-00037-pcc-556658726901.us-east1.run.app/health
+- [ ] Cloud Run service running: https://real-estate-leads-api-775497803476.us-east1.run.app/health
 - [ ] Have Gemini API key ready
 - [ ] Have 13-17 hours available (can split across days)
 - [ ] Have phone for testing calls

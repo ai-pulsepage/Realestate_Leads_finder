@@ -383,8 +383,15 @@ Guidelines:
                 console.log('🎵 Received MULAW buffer, size:', mulawBuffer.length);
 
                 // Convert MULAW to 16-bit PCM (8kHz)
-                const pcm8kBuffer = g711.ulawToPCM(mulawBuffer);
-                console.log('🎵 Converted MULAW to PCM (8kHz), size:', pcm8kBuffer.length);
+                let pcm8kBuffer = g711.ulawToPCM(mulawBuffer);
+
+                // Ensure we have a proper Buffer object
+                if (!Buffer.isBuffer(pcm8kBuffer)) {
+                  console.log('🔧 Converting to Buffer, type:', typeof pcm8kBuffer);
+                  pcm8kBuffer = Buffer.from(pcm8kBuffer);
+                }
+
+                console.log('🎵 Converted MULAW to PCM (8kHz), size:', pcm8kBuffer.length, 'type:', typeof pcm8kBuffer);
 
                 // Upsample 8kHz → 16kHz using correct linear interpolation
                 // Input: 1 sample, Output: 2 samples (original + interpolated)

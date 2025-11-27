@@ -4,7 +4,7 @@
 echo "🚀 Deploying to Cloud Run..."
 
 # Build and deploy
-gcloud run deploy real-estate-leads-api-00037-pcc \
+gcloud run deploy real-estate-leads-api \
   --source . \
   --region us-east1 \
   --platform managed \
