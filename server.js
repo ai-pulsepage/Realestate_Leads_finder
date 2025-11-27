@@ -51,7 +51,7 @@ try {
   });
 
   console.log('Loading routes...');
-  
+
   console.log('  Loading properties...');
   const propertiesRoutes = require('./routes/properties');
   console.log('  ✓ Properties');
@@ -112,15 +112,15 @@ try {
       const path = require('path');
       const migrationPath = path.join(__dirname, 'migrations', '006_extend_knowledge_data.sql');
       const migrationSQL = fs.readFileSync(migrationPath, 'utf8');
-      
+
       const statements = migrationSQL.split(';').filter(stmt => stmt.trim().length > 0);
-      
+
       for (const stmt of statements) {
         if (stmt.trim()) {
           await pool.query(stmt);
         }
       }
-      
+
       res.json({ success: true, message: 'Migration 006 completed' });
     } catch (error) {
       res.status(500).json({ success: false, error: error.message });
@@ -199,8 +199,8 @@ try {
         if (kbQuery.rows.length > 0) {
           const kbData = kbQuery.rows[0].knowledge_data || {};
           knowledgeBase = kbData.languages?.[language]?.content ||
-                          kbData.content ||
-                          'You are a helpful real estate assistant.';
+            kbData.content ||
+            'You are a helpful real estate assistant.';
         }
       } catch (error) {
         console.error('❌ Error loading knowledge base:', error);
@@ -241,99 +241,99 @@ Guidelines:
               console.log('✅ Gemini Live session connected successfully');
             },
             onmessage: (message) => {
-        try {
-          console.log('🎤 Gemini response received, type:', message.type || 'unknown');
+              try {
+                console.log('🎤 Gemini response received, type:', message.type || 'unknown');
 
-          // Log message structure for debugging
-          if (message.serverContent) {
-            console.log('📝 Server content received:', JSON.stringify(message.serverContent, null, 2));
-          }
-          if (message.clientContent) {
-            console.log('📝 Client content received:', JSON.stringify(message.clientContent, null, 2));
-          }
+                // Log message structure for debugging
+                if (message.serverContent) {
+                  console.log('📝 Server content received:', JSON.stringify(message.serverContent, null, 2));
+                }
+                if (message.clientContent) {
+                  console.log('📝 Client content received:', JSON.stringify(message.clientContent, null, 2));
+                }
 
-          // Handle audio response from Gemini (supports both binary and inline formats)
-          let audioData = null;
+                // Handle audio response from Gemini (supports both binary and inline formats)
+                let audioData = null;
 
-          if (message.data) {
-            // Legacy format: raw binary audio
-            audioData = Buffer.from(message.data);
-          } else if (message.serverContent?.modelTurn?.parts?.[0]?.inlineData) {
-            // New format: JSON audio in modelTurn.parts[0].inlineData
-            const inline = message.serverContent.modelTurn.parts[0].inlineData;
-            if (inline.mimeType.startsWith('audio/')) {
-              audioData = Buffer.from(inline.data, 'base64');
-            }
-          }
+                if (message.data) {
+                  // Legacy format: raw binary audio
+                  audioData = Buffer.from(message.data);
+                } else if (message.serverContent?.modelTurn?.parts?.[0]?.inlineData) {
+                  // New format: JSON audio in modelTurn.parts[0].inlineData
+                  const inline = message.serverContent.modelTurn.parts[0].inlineData;
+                  if (inline.mimeType.startsWith('audio/')) {
+                    audioData = Buffer.from(inline.data, 'base64');
+                  }
+                }
 
-          if (audioData) {
-            console.log('🔊 Gemini audio response received, size:', audioData.length);
+                if (audioData) {
+                  console.log('🔊 Gemini audio response received, size:', audioData.length);
 
-            // Convert 16-bit PCM (24kHz) to 8kHz PCM, then to MULAW for Twilio
-            // audioData is raw binary PCM data from Gemini (24kHz, 16-bit)
-            const pcm24kBuffer = audioData;
+                  // Convert 16-bit PCM (24kHz) to 8kHz PCM, then to MULAW for Twilio
+                  // audioData is raw binary PCM data from Gemini (24kHz, 16-bit)
+                  const pcm24kBuffer = audioData;
 
-            // Simple downsampling: 24kHz -> 8kHz (take every 3rd sample)
-            const pcm8kBuffer = Buffer.alloc(Math.floor(pcm24kBuffer.length / 6) * 2); // 16-bit samples
-            for (let i = 0, j = 0; i < pcm24kBuffer.length - 2; i += 6, j += 2) {
-              // Take every 3rd 16-bit sample (24kHz / 3 = 8kHz)
-              pcm8kBuffer[j] = pcm24kBuffer[i];
-              pcm8kBuffer[j + 1] = pcm24kBuffer[i + 1];
-            }
+                  // Simple downsampling: 24kHz -> 8kHz (take every 3rd sample)
+                  const pcm8kBuffer = Buffer.alloc(Math.floor(pcm24kBuffer.length / 6) * 2); // 16-bit samples
+                  for (let i = 0, j = 0; i < pcm24kBuffer.length - 2; i += 6, j += 2) {
+                    // Take every 3rd 16-bit sample (24kHz / 3 = 8kHz)
+                    pcm8kBuffer[j] = pcm24kBuffer[i];
+                    pcm8kBuffer[j + 1] = pcm24kBuffer[i + 1];
+                  }
 
-            const mulawAudioData = g711.ulawFromPCM(pcm8kBuffer);
-            console.log('🔊 Resampled to 8kHz PCM size:', pcm8kBuffer.length, 'MULAW size:', mulawAudioData.length);
+                  const mulawAudioData = g711.ulawFromPCM(pcm8kBuffer);
+                  console.log('🔊 Resampled to 8kHz PCM size:', pcm8kBuffer.length, 'MULAW size:', mulawAudioData.length);
 
-            // Send audio back to Twilio
-            ws.send(JSON.stringify({
-              event: 'media',
-              media: {
-                payload: mulawAudioData.toString('base64')
-              }
-            }));
-            console.log('🔊 MULAW audio sent to Twilio successfully');
-          }
+                  // Send audio back to Twilio
+                  ws.send(JSON.stringify({
+                    event: 'media',
+                    media: {
+                      payload: mulawAudioData.toString('base64')
+                    }
+                  }));
+                  console.log('🔊 MULAW audio sent to Twilio successfully');
+                }
 
-          // Handle text transcripts (both user input and AI responses)
-          if (message.serverContent && message.serverContent.modelTurn) {
-            const turn = message.serverContent.modelTurn;
-            if (turn.parts && turn.parts[0] && turn.parts[0].text) {
-              const transcript = turn.parts[0].text;
-              console.log(`🎤 Gemini transcript: "${transcript}"`);
+                // Handle text transcripts (both user input and AI responses)
+                if (message.serverContent && message.serverContent.modelTurn) {
+                  const turn = message.serverContent.modelTurn;
+                  if (turn.parts && turn.parts[0] && turn.parts[0].text) {
+                    const transcript = turn.parts[0].text;
+                    console.log(`🎤 Gemini transcript: "${transcript}"`);
 
-              // Log AI response to database
-              pool.query(`
+                    // Log AI response to database
+                    pool.query(`
                 UPDATE ai_voice_call_logs
                 SET call_transcript = COALESCE(call_transcript, '') || '\nAI: ' || $1
                 WHERE user_id = $2 AND call_transcript LIKE '%' || $3 || '%'
               `, [transcript, userId, callSid]).catch(err =>
-                console.error('❌ Error logging AI response:', err)
-              );
-            }
-          }
+                      console.error('❌ Error logging AI response:', err)
+                    );
+                  }
+                }
 
-          // Handle user input transcripts
-          if (message.serverContent && message.serverContent.userTurn) {
-            const turn = message.serverContent.userTurn;
-            if (turn.parts && turn.parts[0] && turn.parts[0].text) {
-              const userTranscript = turn.parts[0].text;
-              console.log(`🎤 User said: "${userTranscript}"`);
+                // Handle user input transcripts
+                if (message.serverContent && message.serverContent.userTurn) {
+                  const turn = message.serverContent.userTurn;
+                  if (turn.parts && turn.parts[0] && turn.parts[0].text) {
+                    const userTranscript = turn.parts[0].text;
+                    console.log(`🎤 User said: "${userTranscript}"`);
 
-              // Log user input to database
-              pool.query(`
+                    // Log user input to database
+                    pool.query(`
                 UPDATE ai_voice_call_logs
                 SET call_transcript = COALESCE(call_transcript, '') || '\nCaller: ' || $1
                 WHERE user_id = $2 AND call_transcript LIKE '%' || $3 || '%'
               `, [userTranscript, userId, callSid]).catch(err =>
-                console.error('❌ Error logging user input:', err)
-              );
-            }
-          }
+                      console.error('❌ Error logging user input:', err)
+                    );
+                  }
+                }
 
-        } catch (error) {
-          console.error('❌ Error processing Gemini response:', error);
-        }
-      },
+              } catch (error) {
+                console.error('❌ Error processing Gemini response:', error);
+              }
+            },
             onerror: (error) => {
               console.error('❌ Gemini session error:', error);
             },
@@ -407,10 +407,13 @@ Guidelines:
                 console.log('📏 Created 16kHz buffer, target size:', pcm16k.length);
 
                 // Linear Interpolation / Duplication: duplicate each 8kHz sample
+                // Linear Interpolation (Smoothing)
                 for (let i = 0; i < pcm8k.length; i++) {
-                  const sample = pcm8k[i];
-                  pcm16k[i * 2] = sample;     // Slot 1: original sample
-                  pcm16k[i * 2 + 1] = sample; // Slot 2: duplicate sample
+                  const current = pcm8k[i];
+                  const next = (i < pcm8k.length - 1) ? pcm8k[i + 1] : current;
+
+                  pcm16k[i * 2] = current;           // Original sample
+                  pcm16k[i * 2 + 1] = (current + next) / 2; // Average (Smoothed)
                 }
                 console.log('🔄 Upsampling complete, 16kHz buffer size:', pcm16k.length);
 
