@@ -382,41 +382,22 @@ Guidelines:
                 const mulawBuffer = Buffer.from(data.media.payload, 'base64');
                 console.log('🎵 Received MULAW buffer, size:', mulawBuffer.length);
 
-                // Convert MULAW to 16-bit PCM (8kHz)
-                let pcm8kBuffer = g711.ulawToPCM(mulawBuffer);
+                // Convert MULAW to PCM using g711 (returns Int16Array)
+                const pcm8k = g711.ulawToPCM(mulawBuffer); // Returns Int16Array
+                console.log('🎵 Converted MULAW to PCM (8kHz), size:', pcm8k.length, 'type:', pcm8k.constructor.name);
 
-                // Ensure we have a proper Buffer object
-                if (!Buffer.isBuffer(pcm8kBuffer)) {
-                  console.log('🔧 Converting to Buffer, type:', typeof pcm8kBuffer);
-                  pcm8kBuffer = Buffer.from(pcm8kBuffer);
+                // Upsample 8kHz → 16kHz by duplicating samples (simple approach)
+                // Create Int16Array of double length for 16kHz
+                const pcm16k = new Int16Array(pcm8k.length * 2);
+
+                // Duplicate each sample to double the sample rate
+                for (let i = 0; i < pcm8k.length; i++) {
+                  pcm16k[i * 2] = pcm8k[i];     // Original sample
+                  pcm16k[i * 2 + 1] = pcm8k[i]; // Duplicate for 16kHz
                 }
 
-                console.log('🎵 Converted MULAW to PCM (8kHz), size:', pcm8kBuffer.length, 'type:', typeof pcm8kBuffer);
-
-                // Upsample 8kHz → 16kHz using correct linear interpolation
-                // Input: 1 sample, Output: 2 samples (original + interpolated)
-                const inputSamples = pcm8kBuffer.length / 2;  // 16-bit = 2 bytes per sample
-                const outputSamples = inputSamples * 2;       // Double the sample rate
-                const pcm16kBuffer = Buffer.alloc(outputSamples * 2);  // 2 bytes per sample
-
-                for (let i = 0; i < inputSamples - 1; i++) {
-                  // Read current and next sample (16-bit little-endian)
-                  const sample1 = pcm8kBuffer.readInt16LE(i * 2);
-                  const sample2 = pcm8kBuffer.readInt16LE((i + 1) * 2);
-
-                  // Write original sample
-                  pcm16kBuffer.writeInt16LE(sample1, i * 4);
-
-                  // Write interpolated sample (average of current and next)
-                  const interpolated = Math.round((sample1 + sample2) / 2);
-                  pcm16kBuffer.writeInt16LE(interpolated, i * 4 + 2);
-                }
-
-                // Handle last sample (no next sample to interpolate with)
-                const lastSample = pcm8kBuffer.readInt16LE((inputSamples - 1) * 2);
-                pcm16kBuffer.writeInt16LE(lastSample, (outputSamples - 2) * 2);
-                pcm16kBuffer.writeInt16LE(lastSample, (outputSamples - 1) * 2);
-
+                // Convert Int16Array to Buffer for base64 encoding
+                const pcm16kBuffer = Buffer.from(pcm16k.buffer);
                 console.log('🎵 Upsampled to PCM (16kHz), size:', pcm16kBuffer.length);
 
                 // Encode to base64
