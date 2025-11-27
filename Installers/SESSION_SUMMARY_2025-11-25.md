@@ -22,7 +22,7 @@
 
 ### 3. **Successfully Deployed to Cloud Run**
 - **Final Revision:** 00023-xr4
-- **Service:** real-estate-leads-api-00037-pcc
+- **Service:** real-estate-leads-api
 - **Region:** us-east1
 - **Status:** Serving 100% traffic
 
@@ -245,9 +245,9 @@
 
 **Cloud Run Service:**
 - Project: real-estate-leads-478814
-- Service: real-estate-leads-api-00037-pcc
+- Service: real-estate-leads-api
 - Region: us-east1
-- URL: https://real-estate-leads-api-00037-pcc-775497803476.us-east1.run.app
+- URL: https://real-estate-leads-api-775497803476.us-east1.run.app
 
 **Database:**
 - Instance: real-estate-leads-478814:us-east1:real-estate-leads-db

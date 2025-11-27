@@ -137,7 +137,7 @@ git push origin main
 ### Step 1.7: Deploy to Cloud Run
 
 ```bash
-gcloud run deploy real-estate-leads-api-00037-pcc \
+gcloud run deploy real-estate-leads-api \
   --source . \
   --region us-east1 \
   --platform managed \
@@ -159,10 +159,10 @@ STRIPE_WEBHOOK_SECRET="whsec_b1f8d5e3c8a4f2e9d6c3b0a7f4e1d8c5"
 
 ```bash
 # Check deployment status
-gcloud run services describe real-estate-leads-api-00037-pcc --region us-east1
+gcloud run services describe real-estate-leads-api --region us-east1
 
 # Test health endpoint
-curl https://real-estate-leads-api-00037-pcc-556658726901.us-east1.run.app/health
+curl https://real-estate-leads-api-556658726901.us-east1.run.app/health
 ```
 
 **Expected response:**
@@ -188,11 +188,11 @@ curl https://real-estate-leads-api-00037-pcc-556658726901.us-east1.run.app/healt
 ```
 A CALL COMES IN:
   Type: Webhook
-  URL: https://real-estate-leads-api-00037-pcc-556658726901.us-east1.run.app/api/voice-ai/incoming
+  URL: https://real-estate-leads-api-556658726901.us-east1.run.app/api/voice-ai/incoming
   Method: HTTP POST
 
 STATUS CALLBACK URL:
-  URL: https://real-estate-leads-api-00037-pcc-556658726901.us-east1.run.app/api/voice-ai/status-callback
+  URL: https://real-estate-leads-api-556658726901.us-east1.run.app/api/voice-ai/status-callback
   Method: HTTP POST
 ```
 
@@ -205,7 +205,7 @@ STATUS CALLBACK URL:
 3. **Enable Event Webhook:** ON
 4. **HTTP POST URL:**
 ```
-https://real-estate-leads-api-00037-pcc-556658726901.us-east1.run.app/api/email-campaigns/webhook/sendgrid
+https://real-estate-leads-api-556658726901.us-east1.run.app/api/email-campaigns/webhook/sendgrid
 ```
 
 5. **Select Actions to Post:**
@@ -226,7 +226,7 @@ Verify existing webhook is active:
 1. **Login to Stripe:** https://dashboard.stripe.com/test/webhooks
 2. **Verify endpoint exists:**
 ```
-https://real-estate-leads-api-00037-pcc-556658726901.us-east1.run.app/api/stripe/webhook
+https://real-estate-leads-api-556658726901.us-east1.run.app/api/stripe/webhook
 ```
 3. **Verify events:**
    - ✅ checkout.session.completed
@@ -354,7 +354,7 @@ LIMIT 1;
 #### Test 2.1: Get All Appointments
 
 ```bash
-curl "https://real-estate-leads-api-00037-pcc-556658726901.us-east1.run.app/api/appointments/6f92d630-38f4-4f61-ae24-2a8568b080bc"
+curl "https://real-estate-leads-api-556658726901.us-east1.run.app/api/appointments/6f92d630-38f4-4f61-ae24-2a8568b080bc"
 ```
 
 **Expected:** JSON array with appointments
@@ -363,7 +363,7 @@ curl "https://real-estate-leads-api-00037-pcc-556658726901.us-east1.run.app/api/
 
 ```bash
 # Use appointment_id from previous test
-curl "https://real-estate-leads-api-00037-pcc-556658726901.us-east1.run.app/api/appointments/single/APPOINTMENT_ID_HERE"
+curl "https://real-estate-leads-api-556658726901.us-east1.run.app/api/appointments/single/APPOINTMENT_ID_HERE"
 ```
 
 **Expected:** Full appointment details
@@ -371,7 +371,7 @@ curl "https://real-estate-leads-api-00037-pcc-556658726901.us-east1.run.app/api/
 #### Test 2.3: Create Appointment Manually
 
 ```bash
-curl -X POST https://real-estate-leads-api-00037-pcc-556658726901.us-east1.run.app/api/appointments \
+curl -X POST https://real-estate-leads-api-556658726901.us-east1.run.app/api/appointments \
   -H "Content-Type: application/json" \
   -d '{
     "user_id": "6f92d630-38f4-4f61-ae24-2a8568b080bc",
@@ -388,7 +388,7 @@ curl -X POST https://real-estate-leads-api-00037-pcc-556658726901.us-east1.run.a
 #### Test 2.4: Update Appointment Status
 
 ```bash
-curl -X PUT "https://real-estate-leads-api-00037-pcc-556658726901.us-east1.run.app/api/appointments/APPOINTMENT_ID_HERE" \
+curl -X PUT "https://real-estate-leads-api-556658726901.us-east1.run.app/api/appointments/APPOINTMENT_ID_HERE" \
   -H "Content-Type: application/json" \
   -d '{"appointment_status": "confirmed"}'
 ```
@@ -398,7 +398,7 @@ curl -X PUT "https://real-estate-leads-api-00037-pcc-556658726901.us-east1.run.a
 #### Test 2.5: Get Appointment Stats
 
 ```bash
-curl "https://real-estate-leads-api-00037-pcc-556658726901.us-east1.run.app/api/appointments/stats/6f92d630-38f4-4f61-ae24-2a8568b080bc"
+curl "https://real-estate-leads-api-556658726901.us-east1.run.app/api/appointments/stats/6f92d630-38f4-4f61-ae24-2a8568b080bc"
 ```
 
 **Expected:** Stats object with counts
@@ -408,7 +408,7 @@ curl "https://real-estate-leads-api-00037-pcc-556658726901.us-east1.run.app/api/
 #### Test 3.1: Get All Templates
 
 ```bash
-curl "https://real-estate-leads-api-00037-pcc-556658726901.us-east1.run.app/api/email-templates/6f92d630-38f4-4f61-ae24-2a8568b080bc"
+curl "https://real-estate-leads-api-556658726901.us-east1.run.app/api/email-templates/6f92d630-38f4-4f61-ae24-2a8568b080bc"
 ```
 
 **Expected:** System templates (3) + custom templates
@@ -416,7 +416,7 @@ curl "https://real-estate-leads-api-00037-pcc-556658726901.us-east1.run.app/api/
 #### Test 3.2: Create Custom Template
 
 ```bash
-curl -X POST https://real-estate-leads-api-00037-pcc-556658726901.us-east1.run.app/api/email-templates \
+curl -X POST https://real-estate-leads-api-556658726901.us-east1.run.app/api/email-templates \
   -H "Content-Type: application/json" \
   -d '{
     "user_id": "6f92d630-38f4-4f61-ae24-2a8568b080bc",
@@ -434,7 +434,7 @@ curl -X POST https://real-estate-leads-api-00037-pcc-556658726901.us-east1.run.a
 #### Test 3.3: AI-Assisted Content
 
 ```bash
-curl -X POST https://real-estate-leads-api-00037-pcc-556658726901.us-east1.run.app/api/email-templates/ai-assist \
+curl -X POST https://real-estate-leads-api-556658726901.us-east1.run.app/api/email-templates/ai-assist \
   -H "Content-Type: application/json" \
   -d '{
     "prompt": "Write an email about a foreclosure property in Miami Beach",
@@ -450,7 +450,7 @@ curl -X POST https://real-estate-leads-api-00037-pcc-556658726901.us-east1.run.a
 #### Test 4.1: Create Campaign
 
 ```bash
-curl -X POST https://real-estate-leads-api-00037-pcc-556658726901.us-east1.run.app/api/email-campaigns \
+curl -X POST https://real-estate-leads-api-556658726901.us-east1.run.app/api/email-campaigns \
   -H "Content-Type: application/json" \
   -d '{
     "user_id": "6f92d630-38f4-4f61-ae24-2a8568b080bc",
@@ -477,7 +477,7 @@ curl -X POST https://real-estate-leads-api-00037-pcc-556658726901.us-east1.run.a
 
 ```bash
 # Use campaign_id from previous response
-curl -X POST "https://real-estate-leads-api-00037-pcc-556658726901.us-east1.run.app/api/email-campaigns/CAMPAIGN_ID_HERE/send"
+curl -X POST "https://real-estate-leads-api-556658726901.us-east1.run.app/api/email-campaigns/CAMPAIGN_ID_HERE/send"
 ```
 
 **Expected:** 
@@ -493,7 +493,7 @@ curl -X POST "https://real-estate-leads-api-00037-pcc-556658726901.us-east1.run.
 #### Test 4.4: Get Campaign Analytics
 
 ```bash
-curl "https://real-estate-leads-api-00037-pcc-556658726901.us-east1.run.app/api/email-campaigns/analytics/CAMPAIGN_ID_HERE"
+curl "https://real-estate-leads-api-556658726901.us-east1.run.app/api/email-campaigns/analytics/CAMPAIGN_ID_HERE"
 ```
 
 **Expected:** 
@@ -811,7 +811,7 @@ Copy this template and fill it out after completing implementation:
 ### Cloud Run Deployment
 - [ ] Code committed to GitHub
 - [ ] Deployed successfully to Cloud Run
-- [ ] Service URL: https://real-estate-leads-api-00037-pcc-556658726901.us-east1.run.app
+- [ ] Service URL: https://real-estate-leads-api-556658726901.us-east1.run.app
 - [ ] Deployment time: [X] minutes
 - [ ] Any downtime during deployment: [YES/NO - duration]
 
@@ -927,28 +927,28 @@ Copy this template and fill it out after completing implementation:
 ### Voice AI Test
 ```bash
 # Test incoming call webhook
-curl -X POST https://real-estate-leads-api-00037-pcc-556658726901.us-east1.run.app/api/voice-ai/incoming \
+curl -X POST https://real-estate-leads-api-556658726901.us-east1.run.app/api/voice-ai/incoming \
   -d "CallSid=TEST&From=+15551234567&To=+17865446480&CallStatus=ringing"
 ```
 
 ### Appointments Test
 ```bash
 # Create appointment
-curl -X POST https://real-estate-leads-api-00037-pcc-556658726901.us-east1.run.app/api/appointments \
+curl -X POST https://real-estate-leads-api-556658726901.us-east1.run.app/api/appointments \
   -H "Content-Type: application/json" \
   -d '{"user_id":"6f92d630-38f4-4f61-ae24-2a8568b080bc","contact_name":"Test","appointment_datetime":"2025-11-26T10:00:00Z"}'
 
 # Get appointments
-curl "https://real-estate-leads-api-00037-pcc-556658726901.us-east1.run.app/api/appointments/6f92d630-38f4-4f61-ae24-2a8568b080bc"
+curl "https://real-estate-leads-api-556658726901.us-east1.run.app/api/appointments/6f92d630-38f4-4f61-ae24-2a8568b080bc"
 ```
 
 ### Email Templates Test
 ```bash
 # Get templates
-curl "https://real-estate-leads-api-00037-pcc-556658726901.us-east1.run.app/api/email-templates/6f92d630-38f4-4f61-ae24-2a8568b080bc"
+curl "https://real-estate-leads-api-556658726901.us-east1.run.app/api/email-templates/6f92d630-38f4-4f61-ae24-2a8568b080bc"
 
 # AI-assist
-curl -X POST https://real-estate-leads-api-00037-pcc-556658726901.us-east1.run.app/api/email-templates/ai-assist \
+curl -X POST https://real-estate-leads-api-556658726901.us-east1.run.app/api/email-templates/ai-assist \
   -H "Content-Type: application/json" \
   -d '{"prompt":"Write email about distressed property","tone":"professional"}'
 ```
@@ -956,7 +956,7 @@ curl -X POST https://real-estate-leads-api-00037-pcc-556658726901.us-east1.run.a
 ### Email Campaigns Test
 ```bash
 # Create and send campaign
-curl -X POST https://real-estate-leads-api-00037-pcc-556658726901.us-east1.run.app/api/email-campaigns \
+curl -X POST https://real-estate-leads-api-556658726901.us-east1.run.app/api/email-campaigns \
   -H "Content-Type: application/json" \
   -d '{"user_id":"6f92d630-38f4-4f61-ae24-2a8568b080bc","campaign_name":"Test","subject_line":"Test","html_body":"<p>Test</p>","recipients":[{"email":"test@example.com","name":"Test"}]}'
 ```

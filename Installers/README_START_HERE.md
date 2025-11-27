@@ -273,7 +273,7 @@ If something doesn't work, note it in the completion report with how you fixed i
 **For Questions:** [Contact through project communication channel]
 
 **Repository:** https://github.com/ai-pulsepage/Realestate_Leads_finder  
-**Deployment:** Cloud Run service `real-estate-leads-api-00037-pcc`
+**Deployment:** Cloud Run service `real-estate-leads-api`
 
 ---
 

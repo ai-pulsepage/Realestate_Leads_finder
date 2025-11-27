@@ -1071,7 +1071,7 @@ app.use('/api/email-campaigns', checkDatabase, emailCampaignsRoutes);
 ### Test 1: Create Custom Template
 
 ```bash
-curl -X POST https://real-estate-leads-api-00037-pcc-556658726901.us-east1.run.app/api/email-templates \
+curl -X POST https://real-estate-leads-api-00556658726901.us-east1.run.app/api/email-templates \
   -H "Content-Type: application/json" \
   -d '{
     "user_id": "6f92d630-38f4-4f61-ae24-2a8568b080bc",
@@ -1087,13 +1087,13 @@ curl -X POST https://real-estate-leads-api-00037-pcc-556658726901.us-east1.run.a
 ### Test 2: Get All Templates
 
 ```bash
-curl "https://real-estate-leads-api-00037-pcc-556658726901.us-east1.run.app/api/email-templates/6f92d630-38f4-4f61-ae24-2a8568b080bc"
+curl "https://real-estate-leads-api-556658726901.us-east1.run.app/api/email-templates/6f92d630-38f4-4f61-ae24-2a8568b080bc"
 ```
 
 ### Test 3: AI-Assisted Content Generation
 
 ```bash
-curl -X POST https://real-estate-leads-api-00037-pcc-556658726901.us-east1.run.app/api/email-templates/ai-assist \
+curl -X POST https://real-estate-leads-api-556658726901.us-east1.run.app/api/email-templates/ai-assist \
   -H "Content-Type: application/json" \
   -d '{
     "prompt": "Write an email to a wholesaler about a new flip opportunity in Miami",
@@ -1105,7 +1105,7 @@ curl -X POST https://real-estate-leads-api-00037-pcc-556658726901.us-east1.run.a
 ### Test 4: Create Campaign
 
 ```bash
-curl -X POST https://real-estate-leads-api-00037-pcc-556658726901.us-east1.run.app/api/email-campaigns \
+curl -X POST https://real-estate-leads-api-556658726901.us-east1.run.app/api/email-campaigns \
   -H "Content-Type: application/json" \
   -d '{
     "user_id": "6f92d630-38f4-4f61-ae24-2a8568b080bc",
@@ -1132,7 +1132,7 @@ curl -X POST https://real-estate-leads-api-00037-pcc-556658726901.us-east1.run.a
 
 ```bash
 # Get campaign_id from Test 4 response
-curl -X POST "https://real-estate-leads-api-00037-pcc-556658726901.us-east1.run.app/api/email-campaigns/CAMPAIGN_ID_HERE/send"
+curl -X POST "https://real-estate-leads-api-556658726901.us-east1.run.app/api/email-campaigns/CAMPAIGN_ID_HERE/send"
 ```
 
 ### Test 6: Configure SendGrid Webhook
@@ -1140,7 +1140,7 @@ curl -X POST "https://real-estate-leads-api-00037-pcc-556658726901.us-east1.run.
 1. Log into SendGrid console
 2. Go to Settings → Mail Settings → Event Webhook
 3. Enable Event Webhook
-4. HTTP POST URL: `https://real-estate-leads-api-00037-pcc-556658726901.us-east1.run.app/api/email-campaigns/webhook/sendgrid`
+4. HTTP POST URL: `https://real-estate-leads-api-556658726901.us-east1.run.app/api/email-campaigns/webhook/sendgrid`
 5. Select events: Delivered, Opened, Clicked, Bounced, Unsubscribe
 6. Click "Test Your Integration"
 7. Save
@@ -1148,7 +1148,7 @@ curl -X POST "https://real-estate-leads-api-00037-pcc-556658726901.us-east1.run.
 ### Test 7: Check Analytics
 
 ```bash
-curl "https://real-estate-leads-api-00037-pcc-556658726901.us-east1.run.app/api/email-campaigns/analytics/CAMPAIGN_ID_HERE"
+curl "https://real-estate-leads-api-556658726901.us-east1.run.app/api/email-campaigns/analytics/CAMPAIGN_ID_HERE"
 ```
 
 ### Test 8: Verify Database

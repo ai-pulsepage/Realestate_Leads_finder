@@ -23,7 +23,7 @@ The `/media-stream` route needs to extract `userId`, `language`, and `callSid` f
 
 **Expected URL Format:**
 ```
-wss://real-estate-leads-api-00037-pcc-775497803476.us-east1.run.app/api/voice-ai/media-stream?language=en&userId=6f92d630-38f4-4f61-ae24-2a8568b080bc&callSid=CAxxxx
+wss://real-estate-leads-api-775497803476.us-east1.run.app/api/voice-ai/media-stream?language=en&userId=6f92d630-38f4-4f61-ae24-2a8568b080bc&callSid=CAxxxx
 ```
 
 **Current Code Location:** `routes/voice-ai.js` lines ~1227-1250
@@ -63,7 +63,7 @@ This code SHOULD work, but logs show `undefined` for all params. The most recent
 ### Step 1: Check Deployment Logs for Startup Errors
 
 ```bash
-gcloud run services logs read real-estate-leads-api-00037-pcc \
+gcloud run services logs read real-estate-leads-api \
   --region us-east1 \
   --limit 300 | grep -i "error\|fatal\|crash\|failed"
 ```

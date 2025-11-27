@@ -93,6 +93,18 @@ try {
   const appointmentsRoutes = require('./routes/appointments');
   console.log('  ✓ Appointments');
 
+  console.log('  Loading email-templates...');
+  const emailTemplatesRoutes = require('./routes/email-templates');
+  console.log('  ✓ Email Templates');
+
+  console.log('  Loading email-campaigns...');
+  const emailCampaignsRoutes = require('./routes/email-campaigns');
+  console.log('  ✓ Email Campaigns');
+
+  console.log('  Loading admin-ai...');
+  const adminAiRoutes = require('./routes/admin-ai'); // [AI PERSONA GENERATOR]
+  console.log('  ✓ Admin AI');
+
   console.log('Mounting routes...');
   app.use('/api/properties', checkDatabase, propertiesRoutes);
   app.use('/api/users', checkDatabase, usersRoutes);
@@ -103,6 +115,9 @@ try {
   app.use('/api/saved-leads', checkDatabase, savedLeadsRoutes);
   app.use('/api/voice-ai', checkDatabase, voiceAiRoutes);
   app.use('/api/appointments', checkDatabase, appointmentsRoutes);
+  app.use('/api/email-templates', checkDatabase, emailTemplatesRoutes);
+  app.use('/api/email-campaigns', checkDatabase, emailCampaignsRoutes);
+  app.use('/api/admin-ai', checkDatabase, adminAiRoutes); // [AI PERSONA GENERATOR]
   console.log('✓ Routes mounted');
 
   app.use((err, req, res, next) => {
@@ -210,42 +225,35 @@ try {
     const parsedUrl = url.parse(request.url, true);
     const { language = 'en', userId, callSid } = parsedUrl.query;
 
-    // Load Knowledge Base
-    let knowledgeBase = 'You are a helpful real estate assistant.';
-    try {
-      const kbQuery = await pool.query(
-        'SELECT knowledge_data FROM subscriber_knowledge_base WHERE user_id = $1',
-        [userId]
-      );
-      if (kbQuery.rows.length > 0) {
-        const kbData = kbQuery.rows[0].knowledge_data || {};
-        knowledgeBase = kbData.languages?.[language]?.content || kbData.content || knowledgeBase;
-      }
-    } catch (error) {
-      console.error('❌ Error loading knowledge base:', error);
-    }
-
-    // System Prompt
-    const systemPrompt = `You are a helpful real estate assistant.
-Context: ${knowledgeBase}
-Guidelines:
-- Keep responses concise (under 2 sentences).
-- Be conversational and friendly.
-- Ask one question at a time.
-- Do not use markdown or emojis (this is for voice).`;
-
-    // Start Chat Session
     let chat;
     try {
+      // Fetch subscriber knowledge base AND voice settings
+      const knowledgeQuery = await pool.query(
+        `SELECT knowledge_data FROM subscriber_knowledge_base WHERE user_id = $1`,
+        [userId]
+      );
+
+      let knowledgeBase = {};
+      let systemInstruction = "You are a helpful real estate assistant."; // Default fallback
+
+      if (knowledgeQuery.rows.length > 0) {
+        knowledgeBase = knowledgeQuery.rows[0].knowledge_data || {};
+
+        // Check for custom voice settings
+        if (knowledgeBase.voice_settings && knowledgeBase.voice_settings.system_prompt) {
+          systemInstruction = knowledgeBase.voice_settings.system_prompt;
+          console.log('🎭 Using Custom Persona:', systemInstruction.substring(0, 50) + '...');
+        }
+      }
+
+      // Initialize Gemini Chat with Dynamic Instruction
       chat = model.startChat({
-        history: [
-          { role: "user", parts: [{ text: systemPrompt }] },
-          { role: "model", parts: [{ text: "Understood. I am ready to help." }] }
-        ],
+        systemInstruction: systemInstruction,
       });
       console.log('✅ Gemini Chat Session Started');
-    } catch (chatError) {
-      console.error('❌ Failed to start Gemini Chat:', chatError);
+
+    } catch (error) {
+      console.error('❌ Error initializing chat session:', error);
       ws.close();
       return;
     }

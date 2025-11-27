@@ -215,7 +215,7 @@ router.post('/language-selected', async (req, res) => {
 
 7. **Deploy to Cloud Run:**
    ```bash
-   gcloud run deploy real-estate-leads-api-00037-pcc \
+   gcloud run deploy real-estate-leads-api \
      --source . \
      --region us-east1 \
      --allow-unauthenticated

@@ -433,7 +433,7 @@ router.post('/gemini-response', async (req, res) => {
 Update Cloud Run deployment to include Gemini API key:
 
 ```bash
-gcloud run services update real-estate-leads-api-00037-pcc \
+gcloud run services update real-estate-leads-api \
   --region us-east1 \
   --update-env-vars GEMINI_API_KEY="YOUR_GEMINI_API_KEY_HERE"
 ```
@@ -827,7 +827,7 @@ app.use('/api/appointments', checkDatabase, appointmentsRoutes);
 **Create appointment:**
 
 ```bash
-curl -X POST https://real-estate-leads-api-00037-pcc-556658726901.us-east1.run.app/api/appointments \
+curl -X POST https://real-estate-leads-api-556658726901.us-east1.run.app/api/appointments \
   -H "Content-Type: application/json" \
   -d '{
     "user_id": "6f92d630-38f4-4f61-ae24-2a8568b080bc",
@@ -844,7 +844,7 @@ curl -X POST https://real-estate-leads-api-00037-pcc-556658726901.us-east1.run.a
 **Get appointments:**
 
 ```bash
-curl "https://real-estate-leads-api-00037-pcc-556658726901.us-east1.run.app/api/appointments/6f92d630-38f4-4f61-ae24-2a8568b080bc?upcoming_only=true"
+curl "https://real-estate-leads-api-556658726901.us-east1.run.app/api/appointments/6f92d630-38f4-4f61-ae24-2a8568b080bc?upcoming_only=true"
 ```
 
 ---
@@ -1218,8 +1218,8 @@ router.post('/incoming', checkTokenBalance, async (req, res) => {
 2. Go to Phone Numbers → Manage → Active Numbers
 3. Click on your number: +17865446480
 4. Configure Voice & Fax:
-   - **A CALL COMES IN:** Webhook, `https://real-estate-leads-api-00037-pcc-556658726901.us-east1.run.app/api/voice-ai/incoming`, HTTP POST
-   - **STATUS CALLBACK URL:** `https://real-estate-leads-api-00037-pcc-556658726901.us-east1.run.app/api/voice-ai/status-callback`, HTTP POST
+   - **A CALL COMES IN:** Webhook, `https://real-estate-leads-api-556658726901.us-east1.run.app/api/voice-ai/incoming`, HTTP POST
+   - **STATUS CALLBACK URL:** `https://real-estate-leads-api-556658726901.us-east1.run.app/api/voice-ai/status-callback`, HTTP POST
 5. Save
 
 ### Test 2: Assign Phone Number to Test User
@@ -1333,13 +1333,13 @@ LIMIT 5;
 
 ```bash
 # Get appointments
-curl "https://real-estate-leads-api-00037-pcc-556658726901.us-east1.run.app/api/appointments/6f92d630-38f4-4f61-ae24-2a8568b080bc"
+curl "https://real-estate-leads-api-556658726901.us-east1.run.app/api/appointments/6f92d630-38f4-4f61-ae24-2a8568b080bc"
 
 # Get appointment stats
-curl "https://real-estate-leads-api-00037-pcc-556658726901.us-east1.run.app/api/appointments/stats/6f92d630-38f4-4f61-ae24-2a8568b080bc"
+curl "https://real-estate-leads-api-556658726901.us-east1.run.app/api/appointments/stats/6f92d630-38f4-4f61-ae24-2a8568b080bc"
 
 # Update appointment status
-curl -X PUT "https://real-estate-leads-api-00037-pcc-556658726901.us-east1.run.app/api/appointments/APPOINTMENT_ID_HERE" \
+curl -X PUT "https://real-estate-leads-api-556658726901.us-east1.run.app/api/appointments/APPOINTMENT_ID_HERE" \
   -H "Content-Type: application/json" \
   -d '{"appointment_status": "confirmed"}'
 ```

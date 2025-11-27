@@ -264,7 +264,7 @@ The AI uses this to personalize conversations.
 
 ```bash
 # Check Cloud Run logs
-gcloud run logs read real-estate-leads-api-00037-pcc --region us-east1 --limit 50
+gcloud run logs read real-estate-leads-api --region us-east1 --limit 50
 
 # Check database connection
 psql "postgresql://postgres:Admin%401234@172.27.64.3:5432/real_estate_leads?sslmode=no-verify"

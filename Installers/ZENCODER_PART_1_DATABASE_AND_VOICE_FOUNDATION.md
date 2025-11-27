@@ -1154,7 +1154,7 @@ git commit -m "Add Voice AI foundation routes"
 git push origin main
 
 # Redeploy to Cloud Run
-gcloud run deploy real-estate-leads-api-00037-pcc \
+gcloud run deploy real-estate-leads-api \
   --source . \
   --region us-east1 \
   --platform managed \
@@ -1169,7 +1169,7 @@ gcloud run deploy real-estate-leads-api-00037-pcc \
 **Test 1: Check endpoint exists**
 
 ```bash
-curl -X POST https://real-estate-leads-api-00037-pcc-556658726901.us-east1.run.app/api/voice-ai/incoming \
+curl -X POST https://real-estate-leads-api-556658726901.us-east1.run.app/api/voice-ai/incoming \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "CallSid=TEST123&From=+15551234567&To=+17865446480&CallStatus=ringing"
 ```
