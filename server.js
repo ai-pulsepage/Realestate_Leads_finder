@@ -215,165 +215,101 @@ try {
   async function handleVoiceAIWebSocket(ws, request, pool) {
     let recognizeStream = null;
     let isSpeaking = false;
-    let conversationHistory = [];
-
-    console.log('🎙️ Initializing Google-Native Voice AI Session...');
-
-    // ... (Keep existing setup code) ...
-    // Extract query parameters
-    const url = require('url');
-    const parsedUrl = url.parse(request.url, true);
-    const { language = 'en', userId, callSid } = parsedUrl.query;
-
-    let chat;
-    try {
-      // Fetch subscriber knowledge base AND voice settings
-      const knowledgeQuery = await pool.query(
-        `SELECT knowledge_data FROM subscriber_knowledge_base WHERE user_id = $1`,
-        [userId]
-      );
-
-      let knowledgeBase = {};
-      let systemInstruction = "You are a helpful real estate assistant."; // Default fallback
-
-      if (knowledgeQuery.rows.length > 0) {
-        knowledgeBase = knowledgeQuery.rows[0].knowledge_data || {};
-
-        // Check for custom voice settings
-        if (knowledgeBase.voice_settings && knowledgeBase.voice_settings.system_prompt) {
-          systemInstruction = knowledgeBase.voice_settings.system_prompt;
-          console.log('🎭 Using Custom Persona:', systemInstruction.substring(0, 50) + '...');
-        }
-      }
-
-      // Initialize Gemini Model PER REQUEST to support dynamic system prompt
-      // systemInstruction must be passed to getGenerativeModel, NOT startChat
-      console.log(`🔍 Fetching persona for UserID: ${userId}`);
-      const dynamicModel = genAI.getGenerativeModel({
-        model: "gemini-1.5-flash-001",
-        systemInstruction: systemInstruction
-      });
-
-      // Initialize Gemini Chat
-      chat = dynamicModel.startChat({});
-      console.log('✅ Gemini Chat Session Started');
-
-    } catch (error) {
-      console.error('❌ Error initializing chat session:', error);
-      ws.close();
-      return;
-    }
-
-    // Helper: Start STT Stream
+    let streamSid = null;
+    let callSid = null;
+    let userId = null;
+    let chat = null;
     let transcriptBuffer = '';
     let silenceTimer = null;
 
-    function startRecognitionStream() {
+    // Helper: Start STT Stream
+    function startRecognitionStream(languageCode = 'en-US') {
+      if (recognizeStream) return;
+
+      console.log(`👂 Starting STT Stream (${languageCode})`);
       recognizeStream = speechClient
         .streamingRecognize({
           config: {
             encoding: 'MULAW',
             sampleRateHertz: 8000,
-            languageCode: 'en-US',
+            languageCode: languageCode,
             model: 'phone_call',
             useEnhanced: true,
           },
-          interimResults: false, // We only want final results for now
+          interimResults: true,
         })
         .on('error', console.error)
         .on('data', async (data) => {
           if (data.results[0] && data.results[0].alternatives[0]) {
             const transcript = data.results[0].alternatives[0].transcript;
 
-            // ECHO CANCELLATION: Ignore input if AI is speaking
             if (isSpeaking) {
-              console.log('🙊 Ignoring input (AI is speaking)');
+              // console.log('🙊 Ignoring input (AI is speaking)');
               return;
             }
 
-            console.log(`👂 Partial Heard: "${transcript}"`);
+            if (transcript.trim()) {
+              // console.log(`🎤 Partial: "${transcript}"`);
+              transcriptBuffer += " " + transcript;
 
-            // DEBOUNCE / SILENCE DETECTION
-            // Buffer the transcript and wait for silence before responding.
-            transcriptBuffer += ' ' + transcript;
-
-            if (silenceTimer) clearTimeout(silenceTimer);
-
-            silenceTimer = setTimeout(async () => {
-              const finalTranscript = transcriptBuffer.trim();
-              if (!finalTranscript) return;
-
-              console.log(`✅ Final User Input (after silence): "${finalTranscript}"`);
-              transcriptBuffer = ''; // Clear buffer
-
-              // Log User Input
-              pool.query(`
-                  UPDATE ai_voice_call_logs
-                  SET call_transcript = COALESCE(call_transcript, '') || '\nCaller: ' || $1
-                  WHERE user_id = $2 AND call_transcript LIKE '%' || $3 || '%'
-                `, [finalTranscript, userId, callSid]).catch(e => console.error('DB Log Error:', e));
-
-              // Generate AI Response
-              try {
-                const result = await chat.sendMessage(finalTranscript);
-                const responseText = result.response.text();
-                await speakResponse(responseText);
-              } catch (aiError) {
-                console.error('❌ LLM Error:', aiError);
-              }
-            }, 800); // Wait 800ms for silence
+              if (silenceTimer) clearTimeout(silenceTimer);
+              silenceTimer = setTimeout(async () => {
+                const finalInput = transcriptBuffer.trim();
+                if (finalInput) {
+                  console.log(`🗣️ User Input: "${finalInput}"`);
+                  transcriptBuffer = "";
+                  await processUserMessage(finalInput);
+                }
+              }, 800);
+            }
           }
         });
-      console.log('👂 STT Stream Started');
     }
 
-    // WebSocket Event Handlers
-    let streamSid = null;
-
-    ws.on('message', (message) => {
-      try {
-        const data = JSON.parse(message);
-
-        if (data.event === 'start') {
-          console.log('✅ Twilio Stream Started');
-          streamSid = data.start.streamSid;
-          console.log('StreamSid:', streamSid);
-
-          startRecognitionStream();
-
-          // Initial Greeting
-          speakResponse("Hello! How can I help you with your real estate needs today?");
-
-        } else if (data.event === 'media') {
-          if (recognizeStream && data.media && data.media.payload) {
-            // Write audio to STT stream
-            recognizeStream.write(data.media.payload);
-          }
-        } else if (data.event === 'stop') {
-          console.log('🛑 Twilio Stream Stopped');
-          if (recognizeStream) recognizeStream.end();
-        }
-      } catch (error) {
-        console.error('❌ WebSocket Message Error:', error);
+    // Helper: Process User Message
+    async function processUserMessage(text) {
+      if (!chat) {
+        console.warn('⚠️ Chat not initialized yet');
+        return;
       }
-    });
 
-    // Helper: Generate Audio from Text (TTS)
-    // Moved inside to access streamSid
+      // Log User Input
+      pool.query(`
+            UPDATE ai_voice_call_logs
+            SET call_transcript = COALESCE(call_transcript, '') || '\nCaller: ' || $1
+            WHERE user_id = $2 AND call_transcript LIKE '%' || $3 || '%'
+        `, [text, userId, callSid]).catch(e => console.error('DB Log Error:', e));
+
+      try {
+        const result = await chat.sendMessage(text);
+        const responseText = result.response.text();
+        await speakResponse(responseText);
+      } catch (error) {
+        console.error('❌ LLM Error:', error);
+        await speakResponse("I'm sorry, I'm having trouble connecting. Could you repeat that?");
+      }
+    }
+
+    // Helper: TTS
     async function speakResponse(text) {
       if (!text) return;
-      console.log(`🗣️ Speaking: "${text}"`);
+      console.log(`🤖 AI Speaking: "${text}"`);
       isSpeaking = true;
+
+      // Log AI Response
+      pool.query(`
+            UPDATE ai_voice_call_logs
+            SET call_transcript = COALESCE(call_transcript, '') || '\nAI: ' || $1
+            WHERE user_id = $2 AND call_transcript LIKE '%' || $3 || '%'
+        `, [text, userId, callSid]).catch(e => console.error('DB Log Error:', e));
 
       try {
         const requestBody = {
           input: { text: text },
           voice: {
             languageCode: 'en-US',
-            name: 'Kore',
-            // The API rejected 'model', so it must be 'model_name' (snake_case)
-            // This matches the gRPC field 'modelName'.
-            model_name: 'gemini-2.5-flash-tts'
+            name: 'Kore', // 'en-US-Studio-O' is also good
+            model_name: 'gemini-2.5-flash-tts' // Keeping this as it seemed to work in logs
           },
           audioConfig: {
             audioEncoding: 'MULAW',
@@ -381,47 +317,89 @@ try {
           },
         };
 
-        console.log('📝 TTS Request (REST):', JSON.stringify(requestBody, null, 2));
-
-        // Use REST Client
-        const response = await ttsRestClient.text.synthesize({
-          requestBody: requestBody
-        });
-
+        const response = await ttsRestClient.text.synthesize({ requestBody });
         const audioContent = response.data.audioContent;
 
-        if (!audioContent) {
-          throw new Error('No audio content returned from TTS');
-        }
-
-        console.log(`🎵 TTS Audio generated, size: ${audioContent.length}`);
-
-        // Send to Twilio
-        if (streamSid) {
+        if (streamSid && audioContent) {
           ws.send(JSON.stringify({
             event: 'media',
             streamSid: streamSid,
-            media: {
-              payload: audioContent
-            }
+            media: { payload: audioContent }
           }));
-        } else {
-          console.error('❌ Cannot send audio: StreamSid not yet received');
         }
-
-        // Log to DB
-        pool.query(`
-          UPDATE ai_voice_call_logs
-          SET call_transcript = COALESCE(call_transcript, '') || '\nAI: ' || $1
-          WHERE user_id = $2 AND call_transcript LIKE '%' || $3 || '%'
-        `, [text, userId, callSid]).catch(e => console.error('DB Log Error:', e));
-
       } catch (error) {
-        console.error('❌ TTS Error:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+        console.error('❌ TTS Error:', error);
       } finally {
-        isSpeaking = false;
+        // Reset isSpeaking after a delay (approximate duration)
+        // For now, we just reset it immediately after sending, 
+        // but ideally we wait for the 'mark' event from Twilio.
+        // A simple timeout helps prevent self-interruption.
+        setTimeout(() => { isSpeaking = false; }, 2000);
       }
     }
+
+    ws.on('message', async (message) => {
+      try {
+        const msg = JSON.parse(message);
+
+        switch (msg.event) {
+          case 'start':
+            console.log('🏁 Stream Started');
+            streamSid = msg.start.streamSid;
+            callSid = msg.start.callSid;
+
+            const customParams = msg.start.customParameters || {};
+            userId = customParams.userId;
+            const language = customParams.language || 'en';
+
+            console.log(`👤 UserID: ${userId}, Language: ${language}`);
+
+            // Initialize Gemini
+            try {
+              const knowledgeQuery = await pool.query(
+                `SELECT knowledge_data FROM subscriber_knowledge_base WHERE user_id = $1`,
+                [userId]
+              );
+
+              let systemInstruction = "You are a helpful real estate assistant.";
+              if (knowledgeQuery.rows.length > 0) {
+                const kb = knowledgeQuery.rows[0].knowledge_data || {};
+                if (kb.voice_settings?.system_prompt) {
+                  systemInstruction = kb.voice_settings.system_prompt;
+                  console.log('🎭 Custom Persona Loaded');
+                }
+              }
+
+              const dynamicModel = genAI.getGenerativeModel({
+                model: "gemini-1.5-flash-001",
+                systemInstruction: systemInstruction
+              });
+              chat = dynamicModel.startChat({});
+              console.log('✅ Gemini Chat Ready');
+
+              // Start STT
+              startRecognitionStream(language === 'es' ? 'es-US' : 'en-US');
+
+            } catch (err) {
+              console.error('❌ Init Error:', err);
+            }
+            break;
+
+          case 'media':
+            if (recognizeStream && msg.media.payload) {
+              recognizeStream.write(msg.media.payload);
+            }
+            break;
+
+          case 'stop':
+            console.log('🛑 Stream Stopped');
+            if (recognizeStream) recognizeStream.end();
+            break;
+        }
+      } catch (error) {
+        console.error('❌ WS Message Error:', error);
+      }
+    });
 
     ws.on('close', () => {
       console.log('🔌 WebSocket Closed');

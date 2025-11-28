@@ -300,9 +300,14 @@ router.post('/language-selected', async (req, res) => {
     const protocol = host.includes('localhost') ? 'ws' : 'wss';
 
     const connect = twiml.connect();
-    connect.stream({
-      url: `${protocol}://${host}/api/voice-ai/media-stream?language=${language}&userId=${userId}&callSid=${CallSid}`
+    const stream = connect.stream({
+      url: `${protocol}://${host}/api/voice-ai/media-stream`
     });
+
+    // Pass metadata as Custom Parameters (more robust than URL query params)
+    stream.parameter({ name: 'userId', value: userId });
+    stream.parameter({ name: 'language', value: language });
+    stream.parameter({ name: 'callSid', value: CallSid });
 
     console.log(`✅ Connected to WebSocket: ${protocol}://${host}/api/voice-ai/media-stream`);
     res.type('text/xml');
