@@ -87,10 +87,10 @@ router.get('/voice-settings/:user_id', async (req, res) => {
         const { user_id } = req.params;
 
         const result = await req.pool.query(`
-      SELECT knowledge_data->'voice_settings' as voice_settings
-      FROM subscriber_knowledge_base
-      WHERE user_id = $1
-    `, [user_id]);
+          SELECT knowledge_data
+          FROM subscriber_knowledge_base
+          WHERE user_id = $1
+        `, [user_id]);
 
         if (result.rows.length === 0) {
             return res.status(404).json({
@@ -99,9 +99,12 @@ router.get('/voice-settings/:user_id', async (req, res) => {
             });
         }
 
+        const data = result.rows[0].knowledge_data || {};
+
         res.json({
             success: true,
-            voice_settings: result.rows[0].voice_settings || {}
+            voice_settings: data.voice_settings || {},
+            languages: data.languages || {}
         });
 
     } catch (error) {
@@ -121,25 +124,22 @@ router.get('/voice-settings/:user_id', async (req, res) => {
 router.put('/voice-settings/:user_id', async (req, res) => {
     try {
         const { user_id } = req.params;
-        const { system_prompt, voice_id, language } = req.body;
-
-        // We use jsonb_set to update just the voice_settings key, preserving other knowledge
-        // But since we want to update multiple fields inside voice_settings, it's safer to 
-        // read-modify-write or use a deep merge function. 
-        // For simplicity/robustness, we'll assume the client sends the FULL voice_settings object 
-        // or we merge it here. Let's merge it.
+        const { system_prompt, voice_id, language, languages } = req.body;
 
         // First, get existing to merge
         const existing = await req.pool.query(`
-      SELECT knowledge_data->'voice_settings' as voice_settings
-      FROM subscriber_knowledge_base
-      WHERE user_id = $1
-    `, [user_id]);
+          SELECT knowledge_data
+          FROM subscriber_knowledge_base
+          WHERE user_id = $1
+        `, [user_id]);
 
-        let currentSettings = {};
+        let currentData = {};
         if (existing.rows.length > 0) {
-            currentSettings = existing.rows[0].voice_settings || {};
+            currentData = existing.rows[0].knowledge_data || {};
         }
+
+        const currentSettings = currentData.voice_settings || {};
+        const currentLanguages = currentData.languages || {};
 
         const newSettings = {
             ...currentSettings,
@@ -149,16 +149,20 @@ router.put('/voice-settings/:user_id', async (req, res) => {
             last_updated: new Date().toISOString()
         };
 
+        const newLanguages = languages !== undefined ? languages : currentLanguages;
+
+        const newData = {
+            ...currentData,
+            voice_settings: newSettings,
+            languages: newLanguages
+        };
+
         const updateResult = await req.pool.query(`
-      UPDATE subscriber_knowledge_base
-      SET knowledge_data = jsonb_set(
-        knowledge_data,
-        '{voice_settings}',
-        $1::jsonb
-      )
-      WHERE user_id = $2
-      RETURNING knowledge_data->'voice_settings' as voice_settings
-    `, [JSON.stringify(newSettings), user_id]);
+          UPDATE subscriber_knowledge_base
+          SET knowledge_data = $1
+          WHERE user_id = $2
+          RETURNING knowledge_data
+        `, [JSON.stringify(newData), user_id]);
 
         console.log('✅ Voice settings updated for:', user_id);
 
