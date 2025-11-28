@@ -420,7 +420,9 @@ try {
   });
 
   server.on('upgrade', (request, socket, head) => {
+    console.log('🔌 UPGRADE REQUEST RECEIVED:', request.url);
     const pathname = url.parse(request.url).pathname;
+    console.log('🔌 Parsed Pathname:', pathname);
 
     if (pathname === '/api/voice-ai/media-stream') {
       console.log('🔌 WebSocket upgrade requested for Voice AI');
