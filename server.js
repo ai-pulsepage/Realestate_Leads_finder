@@ -246,10 +246,15 @@ try {
         }
       }
 
-      // Initialize Gemini Chat with Dynamic Instruction
-      chat = model.startChat({
-        systemInstruction: systemInstruction,
+      // Initialize Gemini Model PER REQUEST to support dynamic system prompt
+      // systemInstruction must be passed to getGenerativeModel, NOT startChat
+      const dynamicModel = genAI.getGenerativeModel({
+        model: "gemini-2.0-flash",
+        systemInstruction: systemInstruction
       });
+
+      // Initialize Gemini Chat
+      chat = dynamicModel.startChat({});
       console.log('✅ Gemini Chat Session Started');
 
     } catch (error) {
