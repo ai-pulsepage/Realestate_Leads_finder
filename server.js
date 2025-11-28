@@ -243,246 +243,204 @@ try {
           if (data.results[0] && data.results[0].alternatives[0]) {
             const transcript = data.results[0].alternatives[0].transcript;
 
-            if (isSpeaking) {
-              // console.log('🙊 Ignoring input (AI is speaking)');
-              return;
-            }
+            console.log(`🗣️ User: ${transcript}`);
 
-            if (transcript.trim()) {
-              // console.log(`🎤 Partial: "${transcript}"`);
-              transcriptBuffer += " " + transcript;
+            // Debounce
+            transcriptBuffer += ' ' + transcript;
 
-              if (silenceTimer) clearTimeout(silenceTimer);
-              silenceTimer = setTimeout(async () => {
-                const finalInput = transcriptBuffer.trim();
-                if (finalInput) {
-                  console.log(`🗣️ User Input: "${finalInput}"`);
-                  transcriptBuffer = "";
-                  await processUserMessage(finalInput);
-                }
-              }, 800);
-            }
+            if (silenceTimer) clearTimeout(silenceTimer);
+            silenceTimer = setTimeout(() => {
+              const finalMessage = transcriptBuffer.trim();
+              transcriptBuffer = '';
+              if (finalMessage) {
+                processUserMessage(finalMessage);
+              }
+            }, 800);
           }
         });
     }
 
-    // Helper: Process User Message
-    async function processUserMessage(text) {
-      if (!chat) {
-        console.warn('⚠️ Chat not initialized yet');
-        return;
-      }
+    // Helper: Speak Response
+    async function speakResponse(text) {
+      if (!text) return;
+      const cleanedText = cleanText(text);
+      console.log(`🤖 AI: ${cleanedText}`);
 
-      // Log User Input
+      // Log AI Response
       pool.query(`
-            UPDATE ai_voice_call_logs
-            SET call_transcript = COALESCE(call_transcript, '') || '\nCaller: ' || $1
-            WHERE user_id = $2 AND call_transcript LIKE '%' || $3 || '%'
-        `, [text, userId, callSid]).catch(e => console.error('DB Log Error:', e));
-
-      try {
-        const result = await chat.sendMessage(text);
-        const responseText = result.response.text();
-        await speakResponse(responseText);
-      } catch (error) {
-        console.log(`🗣️ User: ${transcript}`);
-
-        // Debounce: Buffer the transcript
-        transcriptBuffer += ' ' + transcript;
-
-        // Reset Silence Timer
-        if (silenceTimer) clearTimeout(silenceTimer);
-        silenceTimer = setTimeout(() => {
-          const finalMessage = transcriptBuffer.trim();
-          transcriptBuffer = ''; // Clear buffer
-          if (finalMessage) {
-            processUserMessage(finalMessage);
-          }
-        }, 800); // 800ms silence threshold
-      }
-    });
-  }
-
-  // Helper: Speak Response
-  async function speakResponse(text) {
-    if (!text) return;
-    const cleanedText = cleanText(text); // Fix: Remove asterisks
-    console.log(`🤖 AI: ${cleanedText}`);
-
-    // Log AI Response
-    pool.query(`
             UPDATE ai_voice_call_logs
             SET call_transcript = COALESCE(call_transcript, '') || '\nAI: ' || $1
             WHERE user_id = $2 AND call_transcript LIKE '%' || $3 || '%'
         `, [text, userId, callSid]).catch(e => console.error('DB Log Error:', e));
 
-    try {
-      isSpeaking = true; // Set flag for barge-in
-      const [response] = await ttsClient.synthesizeSpeech({
-        input: { text: cleanedText },
-        voice: { languageCode: 'en-US', name: 'en-US-Journey-F' }, // Using Journey voice
-        audioConfig: { audioEncoding: 'MULAW', sampleRateHertz: 8000 },
-      });
+      try {
+        isSpeaking = true;
+        const [response] = await ttsRestClient.synthesizeSpeech({
+          input: { text: cleanedText },
+          voice: { languageCode: 'en-US', name: 'en-US-Journey-F' },
+          audioConfig: { audioEncoding: 'MULAW', sampleRateHertz: 8000 },
+        });
 
-      const audioPayload = response.audioContent.toString('base64');
-      const mediaMessage = {
-        event: 'media',
-        streamSid: streamSid,
-        media: { payload: audioPayload },
-      };
-      ws.send(JSON.stringify(mediaMessage));
+        const audioPayload = response.audioContent.toString('base64');
+        const mediaMessage = {
+          event: 'media',
+          streamSid: streamSid,
+          media: { payload: audioPayload },
+        };
+        ws.send(JSON.stringify(mediaMessage));
 
-      // Mark for next turn
-      const markMessage = {
-        event: 'mark',
-        streamSid: streamSid,
-        mark: { name: 'response_end' }
-      };
-      ws.send(JSON.stringify(markMessage));
+        const markMessage = {
+          event: 'mark',
+          streamSid: streamSid,
+          mark: { name: 'response_end' }
+        };
+        ws.send(JSON.stringify(markMessage));
 
-    } catch (error) {
-      console.error('❌ TTS Error:', error);
-      isSpeaking = false;
-    }
-  }
-
-  ws.on('message', async (message) => {
-    try {
-      const msg = JSON.parse(message);
-
-      switch (msg.event) {
-        case 'start':
-          console.log('🏁 Stream Started');
-          streamSid = msg.start.streamSid;
-          callSid = msg.start.callSid;
-
-          // Extract Parameters (Robust Way)
-          const customParams = msg.start.customParameters;
-          userId = customParams.userId;
-          const rawLanguage = customParams.language || 'en';
-          const language = rawLanguage.split('-')[0]; // Normalize 'en-US' -> 'en'
-
-          console.log(`📞 Call Started. StreamSid: ${streamSid}, UserID: ${userId}, Language: ${language}`);
-
-          // Initialize Gemini
-          try {
-            const knowledgeQuery = await pool.query(
-              `SELECT knowledge_data FROM subscriber_knowledge_base WHERE user_id = $1`,
-              [userId]
-            );
-
-            let systemInstruction = "You are a helpful real estate assistant.";
-            let greeting = "Hello! How can I help you with your real estate needs today?"; // Default
-
-            if (knowledgeQuery.rows.length > 0) {
-              const kb = knowledgeQuery.rows[0].knowledge_data || {};
-
-              // 1. Load Persona
-              if (kb.voice_settings?.system_prompt) {
-                systemInstruction = kb.voice_settings.system_prompt;
-                // Fix: Add Multi-lingual instruction
-                systemInstruction += "\n\nIMPORTANT: If the user speaks Spanish, you MUST reply in Spanish. Otherwise, reply in English.";
-                console.log('🎭 Custom Persona Loaded');
-              }
-
-              // 2. Load Greeting based on Language
-              if (kb.languages && kb.languages[language] && kb.languages[language].greeting) {
-                greeting = kb.languages[language].greeting;
-                console.log(`🗣️ Custom Greeting Loaded (${language}): "${greeting}"`);
-              } else {
-                // Fallback greetings if custom is missing
-                greeting = language === 'es'
-                  ? "Hola, ¿cómo puedo ayudarle con sus necesidades inmobiliarias hoy?"
-                  : "Hello! How can I help you with your real estate needs today?";
-              }
-            }
-
-            const dynamicModel = genAI.getGenerativeModel({
-              model: "gemini-2.0-flash-001",
-              systemInstruction: systemInstruction
-            });
-
-            // Fix: Seed History to prevent Double Greeting
-            chat = dynamicModel.startChat({
-              history: [
-                {
-                  role: "model",
-                  parts: [{ text: greeting }]
-                }
-              ]
-            });
-            console.log('✅ Gemini Chat Ready');
-
-            // Start STT
-            startRecognitionStream(language === 'es' ? 'es-US' : 'en-US');
-
-            // Speak the Greeting
-            await speakResponse(greeting);
-
-          } catch (err) {
-            console.error('❌ Init Error:', err);
-          }
-          break;
-
-        case 'media':
-          // Fix: Check if stream is destroyed before writing
-          if (recognizeStream && !recognizeStream.destroyed && msg.media.payload) {
-            recognizeStream.write(msg.media.payload);
-          }
-          break;
-
-        case 'mark':
-          if (msg.mark.name === 'response_end') {
-            isSpeaking = false;
-          }
-          break;
-
-        case 'stop':
-          console.log('🛑 Stream Stopped');
-          if (recognizeStream) recognizeStream.end();
-          break;
+      } catch (error) {
+        console.error('❌ TTS Error:', error);
+        isSpeaking = false;
       }
-    } catch (error) {
-      console.error('❌ WS Message Error:', error);
     }
-  });
 
-  ws.on('close', () => {
-    console.log('🔌 WebSocket Closed');
-    if (recognizeStream) {
-      recognizeStream.end();
-      recognizeStream = null;
+    async function processUserMessage(userMessage) {
+      if (!chat) return;
+      try {
+        const result = await chat.sendMessage(userMessage);
+        const response = result.response;
+        const text = response.text();
+        await speakResponse(text);
+      } catch (error) {
+        console.error('❌ LLM Error:', error);
+        await speakResponse("I'm sorry, I'm having trouble connecting. Could you repeat that?");
+      }
     }
-  });
-}
+
+    ws.on('message', async (message) => {
+      try {
+        const msg = JSON.parse(message);
+
+        switch (msg.event) {
+          case 'start':
+            console.log('🏁 Stream Started');
+            streamSid = msg.start.streamSid;
+            callSid = msg.start.callSid;
+
+            const customParams = msg.start.customParameters;
+            userId = customParams.userId;
+            const rawLanguage = customParams.language || 'en';
+            const language = rawLanguage.split('-')[0];
+
+            console.log(`📞 Call Started. StreamSid: ${streamSid}, UserID: ${userId}, Language: ${language}`);
+
+            try {
+              const knowledgeQuery = await pool.query(
+                `SELECT knowledge_data FROM subscriber_knowledge_base WHERE user_id = $1`,
+                [userId]
+              );
+
+              let systemInstruction = "You are a helpful real estate assistant.";
+              let greeting = "Hello! How can I help you with your real estate needs today?";
+
+              if (knowledgeQuery.rows.length > 0) {
+                const kb = knowledgeQuery.rows[0].knowledge_data || {};
+
+                if (kb.voice_settings?.system_prompt) {
+                  systemInstruction = kb.voice_settings.system_prompt;
+                  systemInstruction += "\n\nIMPORTANT: If the user speaks Spanish, you MUST reply in Spanish. Otherwise, reply in English.";
+                  console.log('🎭 Custom Persona Loaded');
+                }
+
+                if (kb.languages && kb.languages[language] && kb.languages[language].greeting) {
+                  greeting = kb.languages[language].greeting;
+                  console.log(`🗣️ Custom Greeting Loaded (${language}): "${greeting}"`);
+                } else {
+                  greeting = language === 'es'
+                    ? "Hola, ¿cómo puedo ayudarle con sus necesidades inmobiliarias hoy?"
+                    : "Hello! How can I help you with your real estate needs today?";
+                }
+              }
+
+              const dynamicModel = genAI.getGenerativeModel({
+                model: "gemini-2.0-flash-001",
+                systemInstruction: systemInstruction
+              });
+
+              chat = dynamicModel.startChat({
+                history: [
+                  {
+                    role: "model",
+                    parts: [{ text: greeting }]
+                  }
+                ]
+              });
+              console.log('✅ Gemini Chat Ready');
+
+              startRecognitionStream(language === 'es' ? 'es-US' : 'en-US');
+              await speakResponse(greeting);
+
+            } catch (err) {
+              console.error('❌ Init Error:', err);
+            }
+            break;
+
+          case 'media':
+            if (recognizeStream && !recognizeStream.destroyed && msg.media.payload) {
+              recognizeStream.write(msg.media.payload);
+            }
+            break;
+
+          case 'mark':
+            if (msg.mark.name === 'response_end') {
+              isSpeaking = false;
+            }
+            break;
+
+          case 'stop':
+            console.log('🛑 Stream Stopped');
+            if (recognizeStream) recognizeStream.end();
+            break;
+        }
+      } catch (error) {
+        console.error('❌ WS Message Error:', error);
+      }
+    });
+
+    ws.on('close', () => {
+      console.log('🔌 WebSocket Closed');
+      if (recognizeStream) {
+        recognizeStream.end();
+        recognizeStream = null;
+      }
+    });
+  }
 
   // Handle WebSocket upgrades
   const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log('✓✓✓ SERVER STARTED ✓✓✓');
-});
+    console.log('✓✓✓ SERVER STARTED ✓✓✓');
+  });
 
-server.on('upgrade', (request, socket, head) => {
-  const pathname = url.parse(request.url).pathname;
+  server.on('upgrade', (request, socket, head) => {
+    const pathname = url.parse(request.url).pathname;
 
-  if (pathname === '/api/voice-ai/media-stream') {
-    console.log('🔌 WebSocket upgrade requested for Voice AI');
-    console.log('🔌 Request URL:', request.url);
-    console.log('🔌 Request headers:', JSON.stringify(request.headers, null, 2));
-    wss.handleUpgrade(request, socket, head, (ws) => {
-      console.log('🔌 WebSocket connection established successfully');
-      handleVoiceAIWebSocket(ws, request, pool);
-    });
-  } else {
-    console.log(`❌ WebSocket upgrade rejected for path: ${pathname}`);
-    socket.destroy();
-  }
-});
+    if (pathname === '/api/voice-ai/media-stream') {
+      console.log('🔌 WebSocket upgrade requested for Voice AI');
+      console.log('🔌 Request URL:', request.url);
+      console.log('🔌 Request headers:', JSON.stringify(request.headers, null, 2));
+      wss.handleUpgrade(request, socket, head, (ws) => {
+        console.log('🔌 WebSocket connection established successfully');
+        handleVoiceAIWebSocket(ws, request, pool);
+      });
+    } else {
+      console.log(`❌ WebSocket upgrade rejected for path: ${pathname}`);
+      socket.destroy();
+    }
+  });
 
-process.on('SIGTERM', async () => {
-  console.log('SIGTERM received');
-  if (pool) await pool.end();
-  process.exit(0);
-});
+  process.on('SIGTERM', async () => {
+    console.log('SIGTERM received');
+    if (pool) await pool.end();
+    process.exit(0);
+  });
 
 } catch (err) {
   console.error('FATAL STARTUP ERROR:', err);
