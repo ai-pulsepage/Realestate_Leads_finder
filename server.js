@@ -362,16 +362,31 @@ try {
               );
 
               let systemInstruction = "You are a helpful real estate assistant.";
+              let greeting = "Hello! How can I help you with your real estate needs today?"; // Default
+
               if (knowledgeQuery.rows.length > 0) {
                 const kb = knowledgeQuery.rows[0].knowledge_data || {};
+
+                // 1. Load Persona
                 if (kb.voice_settings?.system_prompt) {
                   systemInstruction = kb.voice_settings.system_prompt;
                   console.log('🎭 Custom Persona Loaded');
                 }
+
+                // 2. Load Greeting based on Language
+                if (kb.languages && kb.languages[language] && kb.languages[language].greeting) {
+                  greeting = kb.languages[language].greeting;
+                  console.log(`🗣️ Custom Greeting Loaded (${language}): "${greeting}"`);
+                } else {
+                  // Fallback greetings if custom is missing
+                  greeting = language === 'es'
+                    ? "Hola, ¿cómo puedo ayudarle con sus necesidades inmobiliarias hoy?"
+                    : "Hello! How can I help you with your real estate needs today?";
+                }
               }
 
               const dynamicModel = genAI.getGenerativeModel({
-                model: "gemini-1.5-flash",
+                model: "gemini-2.0-flash-001",
                 systemInstruction: systemInstruction
               });
               chat = dynamicModel.startChat({});
@@ -379,6 +394,9 @@ try {
 
               // Start STT
               startRecognitionStream(language === 'es' ? 'es-US' : 'en-US');
+
+              // Speak the Greeting
+              await speakResponse(greeting);
 
             } catch (err) {
               console.error('❌ Init Error:', err);
