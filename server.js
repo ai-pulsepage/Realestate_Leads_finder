@@ -249,7 +249,7 @@ try {
       // Initialize Gemini Model PER REQUEST to support dynamic system prompt
       // systemInstruction must be passed to getGenerativeModel, NOT startChat
       const dynamicModel = genAI.getGenerativeModel({
-        model: "gemini-2.0-flash",
+        model: "gemini-1.5-flash",
         systemInstruction: systemInstruction
       });
 
