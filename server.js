@@ -334,6 +334,7 @@ try {
             userId = customParams.userId;
             const rawLanguage = customParams.language || 'en';
             const language = rawLanguage.split('-')[0];
+            const spokenGreeting = customParams.greeting || ''; // Get the greeting Twilio just spoke
 
             console.log(`📞 Call Started. StreamSid: ${streamSid}, UserID: ${userId}, Language: ${language}`);
 
@@ -344,7 +345,6 @@ try {
               );
 
               let systemInstruction = "You are a helpful real estate assistant.";
-              let greeting = "Hello! How can I help you with your real estate needs today?";
 
               if (knowledgeQuery.rows.length > 0) {
                 const kb = knowledgeQuery.rows[0].knowledge_data || {};
@@ -354,39 +354,28 @@ try {
                   systemInstruction += "\n\nIMPORTANT: If the user speaks Spanish, you MUST reply in Spanish. Otherwise, reply in English.";
                   console.log('🎭 Custom Persona Loaded');
                 }
+              }
 
-                if (kb.languages && kb.languages[language] && kb.languages[language].greeting) {
-                  greeting = kb.languages[language].greeting;
-                  console.log(`🗣️ Custom Greeting Loaded (${language}): "${greeting}"`);
-                } else {
-                  greeting = language === 'es'
-                    ? "Hola, ¿cómo puedo ayudarle con sus necesidades inmobiliarias hoy?"
-                    : "Hello! How can I help you with your real estate needs today?";
-                }
+              // Context Injection: Tell the AI what just happened
+              if (spokenGreeting) {
+                systemInstruction += `\n\nCONTEXT: You have just greeted the user with the following message: "${spokenGreeting}". Do NOT repeat this greeting. Wait for the user to respond, then answer their question or continue the conversation naturally.`;
               }
 
               const dynamicModel = genAI.getGenerativeModel({
                 model: "gemini-2.0-flash-001",
                 systemInstruction: systemInstruction
               });
-              // Fix: Seed History to prevent Double Greeting
-              // Gemini requires history to start with 'user' role
+
+              // Start Chat with EMPTY history (Standard)
               chat = dynamicModel.startChat({
-                history: [
-                  {
-                    role: "user",
-                    parts: [{ text: "Start call" }]
-                  },
-                  {
-                    role: "model",
-                    parts: [{ text: greeting }]
-                  }
-                ]
+                history: []
               });
               console.log('✅ Gemini Chat Ready');
 
               startRecognitionStream(language === 'es' ? 'es-US' : 'en-US');
-              await speakResponse(greeting);
+
+              // REMOVED: await speakResponse(greeting); 
+              // The AI stays silent and waits for the user.
 
             } catch (err) {
               console.error('❌ Init Error:', err);

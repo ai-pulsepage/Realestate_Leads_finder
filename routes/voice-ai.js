@@ -285,15 +285,14 @@ router.post('/language-selected', async (req, res) => {
     // Create TwiML with greeting and WebSocket connection
     const twiml = new twilio.twiml.VoiceResponse();
 
-    // Play custom greeting
+    // Play custom greeting via Twilio (Robust & Instant)
     const voiceMap = { en: 'Polly.Joanna', es: 'Polly.Lupe' };
     const langMap = { en: 'en-US', es: 'es-US' };
 
-    // REMOVED: Redundant greeting. The AI will greet the user once connected.
-    // twiml.say({
-    //   voice: voiceMap[language],
-    //   language: langMap[language]
-    // }, cleanGreeting);
+    twiml.say({
+      voice: voiceMap[language],
+      language: langMap[language]
+    }, cleanGreeting);
 
     // Connect to WebSocket for real-time conversation
     const host = req.get('host');
@@ -304,10 +303,12 @@ router.post('/language-selected', async (req, res) => {
       url: `${protocol}://${host}/api/voice-ai/media-stream`
     });
 
-    // Pass metadata as Custom Parameters (more robust than URL query params)
+    // Pass metadata as Custom Parameters
     stream.parameter({ name: 'userId', value: userId });
     stream.parameter({ name: 'language', value: language });
     stream.parameter({ name: 'callSid', value: CallSid });
+    // Pass the greeting so the AI knows what was said
+    stream.parameter({ name: 'greeting', value: cleanGreeting });
 
     console.log(`✅ Connected to WebSocket: ${protocol}://${host}/api/voice-ai/media-stream`);
     res.type('text/xml');
