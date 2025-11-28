@@ -248,8 +248,9 @@ try {
 
       // Initialize Gemini Model PER REQUEST to support dynamic system prompt
       // systemInstruction must be passed to getGenerativeModel, NOT startChat
+      console.log(`🔍 Fetching persona for UserID: ${userId}`);
       const dynamicModel = genAI.getGenerativeModel({
-        model: "gemini-1.5-flash",
+        model: "gemini-1.5-flash-001",
         systemInstruction: systemInstruction
       });
 
