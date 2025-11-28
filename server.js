@@ -364,9 +364,14 @@ try {
                 model: "gemini-2.0-flash-001",
                 systemInstruction: systemInstruction
               });
-
+              // Fix: Seed History to prevent Double Greeting
+              // Gemini requires history to start with 'user' role
               chat = dynamicModel.startChat({
                 history: [
+                  {
+                    role: "user",
+                    parts: [{ text: "Start call" }]
+                  },
                   {
                     role: "model",
                     parts: [{ text: greeting }]
