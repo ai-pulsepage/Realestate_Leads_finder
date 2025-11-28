@@ -24,11 +24,6 @@ const VoicePersonaEditor = () => {
     const fetchSettings = async () => {
         try {
             const token = localStorage.getItem('token');
-            // Note: We need to update the GET endpoint to return full knowledge_data or languages too
-            // For now, assuming the backend returns what we need or we fetch it differently.
-            // Actually, I need to update the GET endpoint too! 
-            // Let's assume I fixed the GET endpoint in the previous step (I didn't, I only fixed PUT).
-            // I will fix GET in the next step.
             const res = await axios.get(`http://localhost:8080/api/admin-ai/voice-settings/${userId}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
