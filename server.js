@@ -371,7 +371,7 @@ try {
               }
 
               const dynamicModel = genAI.getGenerativeModel({
-                model: "gemini-1.5-flash-001",
+                model: "gemini-1.5-flash",
                 systemInstruction: systemInstruction
               });
               chat = dynamicModel.startChat({});
