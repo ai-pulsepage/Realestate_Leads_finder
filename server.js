@@ -212,6 +212,11 @@ try {
     console.error('❌ FATAL: Failed to initialize Google Clients:', err);
   }
 
+  // Helper: Clean Text for TTS
+  function cleanText(text) {
+    return text ? text.replace(/[*#]/g, '').trim() : '';
+  }
+
   async function handleVoiceAIWebSocket(ws, request, pool) {
     let recognizeStream = null;
     let isSpeaking = false;
