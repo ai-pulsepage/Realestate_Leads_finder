@@ -12,8 +12,10 @@ function authenticateToken(req, res, next) {
 
     jwt.verify(token, JWT_SECRET, (err, user) => {
         if (err) {
+            console.error('❌ Auth Middleware: Verify Failed', err.message);
             return res.status(403).json({ error: 'Invalid or expired token' });
         }
+        console.log('✅ Auth Middleware: Success', user);
         req.user = user;
         next();
     });

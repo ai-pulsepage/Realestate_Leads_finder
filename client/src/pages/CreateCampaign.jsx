@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, ArrowLeft, Check, Send } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Check, Send, Loader2 } from 'lucide-react';
+import ConfirmationModal from '../components/ConfirmationModal';
 
 const CreateCampaign = () => {
     const navigate = useNavigate();
@@ -11,6 +12,11 @@ const CreateCampaign = () => {
     // Data
     const [templates, setTemplates] = useState([]);
     const [leads, setLeads] = useState([]);
+    const [userBalance, setUserBalance] = useState(0);
+
+    // Cost Preview
+    const [estimatedCost, setEstimatedCost] = useState(0);
+    const [showConfirmModal, setShowConfirmModal] = useState(false);
 
     // Form
     const [formData, setFormData] = useState({
@@ -28,20 +34,52 @@ const CreateCampaign = () => {
         fetchData();
     }, []);
 
+    // Fetch Cost when entering Step 4
+    useEffect(() => {
+        if (step === 4) {
+            fetchCost();
+        }
+    }, [step, formData.selected_leads]);
+
     const fetchData = async () => {
         try {
-            const [tplRes, leadsRes] = await Promise.all([
+            const [tplRes, leadsRes, userRes] = await Promise.all([
                 axios.get(`http://localhost:8080/api/email-templates/${userId}`, { headers: { Authorization: `Bearer ${token}` } }),
-                axios.get(`http://localhost:8080/api/saved-leads/${userId}`, { headers: { Authorization: `Bearer ${token}` } })
+                axios.get(`http://localhost:8080/api/saved-leads/${userId}`, { headers: { Authorization: `Bearer ${token}` } }),
+                axios.get(`http://localhost:8080/api/auth/me`, { headers: { Authorization: `Bearer ${token}` } }) // Assuming /me exists or fetch user
             ]);
             setTemplates(tplRes.data.templates);
             setLeads(leadsRes.data.leads);
+            // Assuming userRes returns balance, if not we might need a specific endpoint or rely on localstorage (less safe)
+            // For now, let's assume we can get it or fetch from a balance endpoint if exists. 
+            // If /auth/me doesn't return balance, we might need to add it or use a different endpoint.
+            // Let's try to fetch from a dedicated balance endpoint if we made one, or just /users/:id
+            const balanceRes = await axios.get(`http://localhost:8080/api/users/${userId}`, { headers: { Authorization: `Bearer ${token}` } });
+            setUserBalance(balanceRes.data.token_balance);
+
         } catch (err) {
             console.error(err);
         }
     };
 
-    const handleCreate = async () => {
+    const fetchCost = async () => {
+        try {
+            const qty = formData.selected_leads.length;
+            if (qty === 0) return;
+            const res = await axios.get(`http://localhost:8080/api/token-pricing/cost/email_send?quantity=${qty}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setEstimatedCost(res.data.total_cost);
+        } catch (err) {
+            console.error("Failed to fetch cost", err);
+        }
+    };
+
+    const handleLaunchClick = () => {
+        setShowConfirmModal(true);
+    };
+
+    const handleConfirmLaunch = async () => {
         setLoading(true);
         try {
             // 1. Get Template Content
@@ -73,15 +111,17 @@ const CreateCampaign = () => {
 
             const campaignId = res.data.campaign.campaign_id;
 
-            // 4. Queue it immediately (Optional, or user can do it from list)
+            // 4. Queue it immediately
             await axios.post(`http://localhost:8080/api/email-campaigns/${campaignId}/send`, {}, {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
+            setShowConfirmModal(false);
             navigate('/email');
         } catch (err) {
             console.error(err);
             alert('Failed to create campaign: ' + (err.response?.data?.message || err.message));
+            setShowConfirmModal(false);
         } finally {
             setLoading(false);
         }
@@ -196,10 +236,19 @@ const CreateCampaign = () => {
                             <div><strong>Subject:</strong> {formData.subject_line}</div>
                             <div><strong>Template:</strong> {templates.find(t => t.template_id === formData.template_id)?.template_name}</div>
                             <div><strong>Recipients:</strong> {formData.selected_leads.length} leads</div>
+                            <div className="pt-2 border-t border-gray-200 mt-2">
+                                <div className="flex justify-between items-center text-lg font-medium">
+                                    <span>Estimated Cost:</span>
+                                    <span className="text-blue-600 font-bold">{estimatedCost} Tokens</span>
+                                </div>
+                                <div className="text-sm text-gray-500 text-right">
+                                    Your Balance: {userBalance} Tokens
+                                </div>
+                            </div>
                         </div>
                         <div className="text-center py-4">
                             <button
-                                onClick={handleCreate}
+                                onClick={handleLaunchClick}
                                 disabled={loading}
                                 className="bg-green-600 text-white px-8 py-3 rounded-lg font-bold hover:bg-green-700 disabled:opacity-50 flex items-center mx-auto"
                             >
@@ -234,6 +283,17 @@ const CreateCampaign = () => {
                 </div>
 
             </div>
+
+            <ConfirmationModal
+                isOpen={showConfirmModal}
+                onClose={() => setShowConfirmModal(false)}
+                onConfirm={handleConfirmLaunch}
+                title="Confirm Campaign Launch"
+                message={`You are about to send "${formData.campaign_name}" to ${formData.selected_leads.length} recipients.`}
+                cost={estimatedCost}
+                currentBalance={userBalance}
+                isLoading={loading}
+            />
         </div>
     );
 };

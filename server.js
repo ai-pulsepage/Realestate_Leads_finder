@@ -37,7 +37,14 @@ try {
   app.use(cors());
   console.log('✓ CORS enabled');
 
-  app.use(express.json());
+  // Capture raw body for Stripe webhooks
+  app.use(express.json({
+    verify: (req, res, buf) => {
+      if (req.originalUrl.startsWith('/api/stripe/webhook')) {
+        req.rawBody = buf.toString();
+      }
+    }
+  }));
   app.use(express.urlencoded({ extended: true }));
 
   app.get('/', (req, res) => {
@@ -55,6 +62,11 @@ try {
 
   // Middleware
   const { authenticateToken } = require('./middleware/auth');
+
+  // Token Pricing Routes (New)
+  const tokenPricingRoutes = require('./routes/token-pricing');
+  app.use('/api/token-pricing', checkDatabase, authenticateToken, tokenPricingRoutes);
+  console.log('  ✓ Token Pricing');
 
   console.log('  Loading properties...');
   const propertiesRoutes = require('./routes/properties');
@@ -117,6 +129,7 @@ try {
   app.use('/api/email-templates', checkDatabase, authenticateToken, emailTemplatesRoutes);
   app.use('/api/email-campaigns', checkDatabase, authenticateToken, emailCampaignsRoutes);
   app.use('/api/admin-ai', checkDatabase, authenticateToken, adminAiRoutes);
+  app.use('/api/token-pricing', checkDatabase, authenticateToken, tokenPricingRoutes); // [NEW]
   console.log('✓ Routes mounted');
 
   app.use((err, req, res, next) => {
@@ -338,34 +351,41 @@ try {
             const rawLanguage = customParams.language || 'en';
             const language = rawLanguage.split('-')[0];
 
+            // Use passed parameters (Efficiency & Consistency)
+            const passedSystemPrompt = customParams.systemPrompt;
+            const passedGreeting = customParams.initialGreeting;
+            let receptionistConfig = {};
+            try {
+              receptionistConfig = JSON.parse(customParams.receptionistConfig || '{}');
+            } catch (e) {
+              console.error('Error parsing receptionistConfig:', e);
+            }
+
             console.log(`📞 Call Started. StreamSid: ${streamSid}, UserID: ${userId}, Language: ${language}`);
 
             try {
-              const knowledgeQuery = await pool.query(
-                `SELECT knowledge_data FROM subscriber_knowledge_base WHERE user_id = $1`,
-                [userId]
-              );
+              let systemInstruction = passedSystemPrompt || "You are a helpful real estate assistant.";
 
-              let systemInstruction = "You are a helpful real estate assistant.";
-              let greeting = "Hello! How can I help you with your real estate needs today?";
+              // Append Receptionist Rules to System Prompt
+              let rules = "\n\n[RECEPTIONIST RULES]";
+              if (receptionistConfig.ask_email) {
+                rules += "\n- You MUST politely ask for the caller's email address if they show interest.";
+              }
+              if (receptionistConfig.calendar_link) {
+                rules += `\n- If the user wants to book an appointment, offer to send them this link: ${receptionistConfig.calendar_link}`;
+              }
+              if (receptionistConfig.sms_followup) {
+                rules += "\n- Inform the user you will send them a text summary after the call.";
+              }
 
-              if (knowledgeQuery.rows.length > 0) {
-                const kb = knowledgeQuery.rows[0].knowledge_data || {};
+              systemInstruction += rules;
+              systemInstruction += "\n\nIMPORTANT: If the user speaks Spanish, you MUST reply in Spanish. Otherwise, reply in English.";
 
-                if (kb.voice_settings?.system_prompt) {
-                  systemInstruction = kb.voice_settings.system_prompt;
-                  systemInstruction += "\n\nIMPORTANT: If the user speaks Spanish, you MUST reply in Spanish. Otherwise, reply in English.";
-                  console.log('🎭 Custom Persona Loaded');
-                }
-
-                if (kb.languages && kb.languages[language] && kb.languages[language].greeting) {
-                  greeting = kb.languages[language].greeting;
-                  console.log(`🗣️ Custom Greeting Loaded (${language}): "${greeting}"`);
-                } else {
-                  greeting = language === 'es'
-                    ? "Hola, ¿cómo puedo ayudarle con sus necesidades inmobiliarias hoy?"
-                    : "Hello! How can I help you with your real estate needs today?";
-                }
+              let greeting = passedGreeting;
+              if (!greeting) {
+                greeting = language === 'es'
+                  ? "Hola, ¿cómo puedo ayudarle con sus necesidades inmobiliarias hoy?"
+                  : "Hello! How can I help you with your real estate needs today?";
               }
 
               const dynamicModel = genAI.getGenerativeModel({

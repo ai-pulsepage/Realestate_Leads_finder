@@ -5,6 +5,7 @@
 
 const express = require('express');
 const router = express.Router();
+const tokenMiddleware = require('../middleware/tokenMiddleware');
 
 // ============================================================
 // GET /api/email-campaigns/:user_id
@@ -119,7 +120,7 @@ router.get('/single/:campaign_id', async (req, res) => {
 // Create new campaign
 // ============================================================
 
-router.post('/', async (req, res) => {
+router.post('/', tokenMiddleware('email_send', (req) => req.body.recipients.length), async (req, res) => {
     try {
         const {
             user_id,
@@ -150,19 +151,7 @@ router.post('/', async (req, res) => {
             });
         }
 
-        // Check token balance (100 tokens per email)
-        const tokensRequired = recipients.length * 100;
-        const balanceQuery = await req.pool.query(
-            'SELECT token_balance FROM subscriber_profiles WHERE user_id = $1',
-            [user_id]
-        );
-
-        if (balanceQuery.rows.length === 0 || balanceQuery.rows[0].token_balance < tokensRequired) {
-            return res.status(402).json({
-                success: false,
-                message: `Insufficient tokens. Required: ${tokensRequired}, Available: ${balanceQuery.rows[0]?.token_balance || 0}`
-            });
-        }
+        // Token deduction handled by middleware
 
         // Create campaign
         const campaignResult = await req.pool.query(`
