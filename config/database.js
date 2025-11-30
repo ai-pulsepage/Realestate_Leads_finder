@@ -9,7 +9,7 @@ if (process.env.DATABASE_URL) {
 
   try {
     pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
+      connectionString: process.env.DATABASE_URL || 'postgresql://api_user:E5"j/Fq|@oqY;+#e@127.0.0.1:5433/real_estate_leads',
       ssl: isProduction && !isPrivateIP,  // SSL for production, but not for private IPs
       max: isProduction ? 20 : 5,  // More connections in production
       idleTimeoutMillis: 30000,

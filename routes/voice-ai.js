@@ -6,6 +6,7 @@
 const express = require('express');
 const router = express.Router();
 const twilio = require('twilio');
+const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 const geminiService = require('../services/gemini');
 
 /**
@@ -194,7 +195,7 @@ router.post('/language-selected', async (req, res) => {
     stream.parameter({ name: 'callSid', value: CallSid });
     stream.parameter({ name: 'systemPrompt', value: system_prompt || '' }); // Pass prompt to stream
     stream.parameter({ name: 'initialGreeting', value: greeting }); // Pass greeting to stream
-    
+
     // Pass receptionist config (serialize to JSON)
     const receptionistConfig = subscriberQuery.rows[0].receptionist_config || {};
     stream.parameter({ name: 'receptionistConfig', value: JSON.stringify(receptionistConfig) });
@@ -489,48 +490,135 @@ router.post('/collect-contact-info', async (req, res) => {
 });
 
 // ============================================================
-// ROUTE 5: Final Response Handler
-// Twilio webhook: POST /api/voice-ai/final-response
+// ROUTE 5: Enqueue Calls (Start Campaign)
+// POST /api/voice-ai/enqueue
 // ============================================================
 
-router.post('/final-response', async (req, res) => {
+router.post('/enqueue', async (req, res) => {
   try {
-    const twiml = new twilio.twiml.VoiceResponse();
-    const speechResult = (req.body.SpeechResult || '').toLowerCase();
+    const { campaignId, userId, leads } = req.body;
+
+    // Validate input
+    if (!userId || !leads || !Array.isArray(leads)) {
+      return res.status(400).json({ error: 'Invalid input' });
+    }
+
+    const queueService = require('../services/queueService');
+    const result = await queueService.addToQueue(campaignId, userId, leads);
+
+    res.json({ success: true, count: result.count });
+
+  } catch (error) {
+    console.error('❌ Error enqueueing calls:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================================
+// ROUTE 6: Initiate Outbound Call (Called by Worker)
+// POST /api/voice-ai/outbound-call
+// ============================================================
+
+router.post('/outbound-call', async (req, res) => {
+  try {
+    const { userId, phoneNumber, queueId } = req.body;
+
+    // Get user's Twilio number
+    const userQuery = await req.pool.query(
+      'SELECT twilio_phone_number FROM users WHERE user_id = $1',
+      [userId]
+    );
+
+    if (userQuery.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const fromNumber = userQuery.rows[0].twilio_phone_number;
+    const host = req.get('host') || process.env.HOST_URL; // Ensure HOST_URL is set in env if req.get('host') is unreliable in worker
+
+    // Initiate Call via Twilio
+    const call = await client.calls.create({
+      url: `https://${host}/api/voice-ai/outbound-connected?userId=${userId}&queueId=${queueId}`, // Webhook when they pick up
+      to: phoneNumber,
+      from: fromNumber,
+      statusCallback: `https://${host}/api/voice-ai/status-callback`,
+      statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
+      machineDetection: 'Enable' // Detect voicemail
+    });
+
+    res.json({ success: true, callSid: call.sid });
+
+  } catch (error) {
+    console.error('❌ Error initiating outbound call:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================================
+// ROUTE 7: Handle Outbound Connection (User picked up)
+// POST /api/voice-ai/outbound-connected
+// ============================================================
+
+router.post('/outbound-connected', async (req, res) => {
+  try {
+    const { userId, queueId } = req.query;
     const callSid = req.body.CallSid;
+    const answeredBy = req.body.AnsweredBy; // human or machine
 
-    if (speechResult.includes('yes') || speechResult.includes('yeah') || speechResult.includes('sure')) {
-      twiml.say({
-        voice: 'Polly.Joanna',
-        language: 'en-US'
-      }, 'What else can I help you with?');
+    console.log(`📞 Outbound call connected. User: ${userId}, AnsweredBy: ${answeredBy}`);
 
-      twiml.redirect({
-        method: 'POST'
-      }, '/api/voice-ai/process-response');
-    } else {
-      twiml.say({
-        voice: 'Polly.Joanna',
-        language: 'en-US'
-      }, 'Thank you for calling. Have a great day!');
+    const twiml = new twilio.twiml.VoiceResponse();
 
+    if (answeredBy === 'machine_start') {
+      // Leave Voicemail
+      twiml.say('Hello, I am calling regarding your property inquiry. Please call us back.');
       twiml.hangup();
+    } else {
+      // Connect to AI
+      const host = req.get('host');
+      const protocol = host.includes('localhost') ? 'ws' : 'wss';
+
+      // Get Settings
+      const subscriberQuery = await req.pool.query(`
+        SELECT vs.system_prompt, vs.greeting_en, vs.receptionist_config
+        FROM voice_settings vs
+        WHERE vs.user_id = $1
+      `, [userId]);
+
+      const settings = subscriberQuery.rows[0] || {};
+      const systemPrompt = settings.system_prompt || "You are a helpful assistant.";
+      // Use a specific outbound greeting if available, otherwise generic
+      const greeting = "Hello! I'm calling from Biz Lead Finders. Am I speaking with the property owner?";
+
+      const connect = twiml.connect();
+      const stream = connect.stream({
+        url: `${protocol}://${host}/api/voice-ai/media-stream`
+      });
+
+      stream.parameter({ name: 'userId', value: userId });
+      stream.parameter({ name: 'callSid', value: callSid });
+      stream.parameter({ name: 'systemPrompt', value: systemPrompt });
+      stream.parameter({ name: 'initialGreeting', value: greeting });
+      stream.parameter({ name: 'receptionistConfig', value: JSON.stringify(settings.receptionist_config || {}) });
+      stream.parameter({ name: 'isOutbound', value: 'true' }); // Flag for AI to know context
     }
 
     res.type('text/xml');
     res.send(twiml.toString());
 
   } catch (error) {
-    console.error('❌ Error in final response:', error);
-
+    console.error('❌ Error in outbound-connected:', error);
     const twiml = new twilio.twiml.VoiceResponse();
-    twiml.say('Thank you for calling. Goodbye!');
     twiml.hangup();
-
     res.type('text/xml');
     res.send(twiml.toString());
   }
 });
+
+// ============================================================
+// ROUTE 8: Final Response Handler (Existing)
+// ...
+
 
 // ============================================================
 // ROUTE 6: Call Status Callback

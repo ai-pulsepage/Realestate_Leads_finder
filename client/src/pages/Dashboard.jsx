@@ -1,9 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Routes, Route, Link } from 'react-router-dom';
-import { LayoutDashboard, Mic, Mail, LogOut, Users } from 'lucide-react';
-import EmailTemplates from './EmailTemplates';
-import EmailCampaigns from './EmailCampaigns';
-import CreateCampaign from './CreateCampaign';
+import { LayoutDashboard, Mic, Mail, LogOut, Users, Phone } from 'lucide-react';
+import VoiceCampaigns from './VoiceCampaigns';
 
 // ... (imports)
 
@@ -17,13 +15,17 @@ import CreateCampaign from './CreateCampaign';
         <Mic size={20} className="mr-3" />
         Voice Persona
     </Link>
+    <Link to="/voice-campaigns" className="flex items-center p-3 text-gray-700 hover:bg-blue-50 rounded-lg transition">
+        <Phone size={20} className="mr-3" />
+        Voice Campaigns
+    </Link>
     <Link to="/email/templates" className="flex items-center p-3 text-gray-700 hover:bg-blue-50 rounded-lg transition">
         <Mail size={20} className="mr-3" />
         Email Templates
     </Link>
     <Link to="/email" className="flex items-center p-3 text-gray-700 hover:bg-blue-50 rounded-lg transition">
         <Mail size={20} className="mr-3" />
-        Campaigns
+        Email Campaigns
     </Link>
     <Link to="/leads" className="flex items-center p-3 text-gray-700 hover:bg-blue-50 rounded-lg transition">
         <Users size={20} className="mr-3" />
@@ -38,6 +40,7 @@ import CreateCampaign from './CreateCampaign';
     <Routes>
         <Route path="/" element={<h2 className="text-2xl font-bold">Welcome to Dashboard</h2>} />
         <Route path="/voice-ai" element={<VoicePersonaEditor />} />
+        <Route path="/voice-campaigns" element={<VoiceCampaigns />} />
         <Route path="/email/templates" element={<EmailTemplates />} />
         <Route path="/email" element={<EmailCampaigns />} />
         <Route path="/email/new" element={<CreateCampaign />} />

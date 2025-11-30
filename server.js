@@ -474,6 +474,10 @@ try {
     }
   });
 
+  // Start Call Worker
+  const { startWorker } = require('./workers/callWorker');
+  startWorker();
+
   process.on('SIGTERM', async () => {
     console.log('SIGTERM received');
     if (pool) await pool.end();
