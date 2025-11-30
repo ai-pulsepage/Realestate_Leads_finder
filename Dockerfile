@@ -1,28 +1,25 @@
-# Use Node.js 18 LTS (matches Cloud Run runtime)
-FROM node:18-slim
+# Use Node.js LTS
+FROM node:20-alpine
 
 # Set working directory
 WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
+COPY client/package*.json ./client/
 
 # Install dependencies
-RUN npm ci --only=production && npm cache clean --force
+RUN npm install
+RUN cd client && npm install
 
-# Copy application code
+# Copy source code
 COPY . .
 
-# Create non-root user for security
-RUN useradd --create-home --shell /bin/bash appuser && chown -R appuser:appuser /app
-USER appuser
+# Build frontend
+RUN cd client && npm run build
 
 # Expose port
 EXPOSE 8080
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:8080/health || exit 1
-
-# Start the application
+# Start command
 CMD ["node", "server.js"]

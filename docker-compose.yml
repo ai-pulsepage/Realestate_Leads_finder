@@ -1,0 +1,106 @@
+version: '3.8'
+
+services:
+  # ------------------------------------------------------------------
+  # 1. REAL ESTATE LEADS APP
+  # ------------------------------------------------------------------
+  app:
+    build: .
+    container_name: real-estate-app
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - DATABASE_URL=postgresql://postgres:password@db:5432/real_estate_leads
+      - TWENTY_API_URL=http://twenty-server:3000
+      - TWENTY_API_KEY=${TWENTY_API_KEY} # User must set this in .env
+      - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID}
+      - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN}
+      - TWILIO_PHONE_NUMBER=${TWILIO_PHONE_NUMBER}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+    depends_on:
+      - db
+      - twenty-server
+    networks:
+      - app-network
+
+  # ------------------------------------------------------------------
+  # 2. SHARED DATABASE (Postgres)
+  # ------------------------------------------------------------------
+  db:
+    image: postgres:16-alpine
+    container_name: shared-db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: real_estate_leads # Default DB
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d # Auto-run migrations
+    ports:
+      - "5432:5432"
+    networks:
+      - app-network
+
+  # ------------------------------------------------------------------
+  # 3. TWENTY CRM (Server)
+  # ------------------------------------------------------------------
+  twenty-server:
+    image: twentycrm/twenty:latest
+    container_name: twenty-server
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - PG_DATABASE_URL=postgresql://postgres:password@db:5432/postgres # Twenty uses 'postgres' DB by default or creates its own
+      - SERVER_URL=http://localhost:3000
+      - FRONT_BASE_URL=http://localhost:3000
+      - STORAGE_TYPE=local
+      - STORAGE_LOCAL_PATH=.local-storage
+      - ACCESS_TOKEN_SECRET=${ACCESS_TOKEN_SECRET:-super_secret_token}
+      - LOGIN_TOKEN_SECRET=${LOGIN_TOKEN_SECRET:-super_secret_login}
+      - REFRESH_TOKEN_SECRET=${REFRESH_TOKEN_SECRET:-super_secret_refresh}
+    depends_on:
+      - db
+      - redis
+    networks:
+      - app-network
+
+  # ------------------------------------------------------------------
+  # 4. TWENTY CRM (Worker)
+  # ------------------------------------------------------------------
+  twenty-worker:
+    image: twentycrm/twenty:latest
+    container_name: twenty-worker
+    restart: always
+    command: ["yarn", "worker:prod"]
+    environment:
+      - PG_DATABASE_URL=postgresql://postgres:password@db:5432/postgres
+      - STORAGE_TYPE=local
+      - STORAGE_LOCAL_PATH=.local-storage
+    depends_on:
+      - db
+      - redis
+    networks:
+      - app-network
+
+  # ------------------------------------------------------------------
+  # 5. REDIS (For Twenty Queues)
+  # ------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: always
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  db-data:
