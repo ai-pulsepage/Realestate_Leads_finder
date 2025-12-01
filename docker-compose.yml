@@ -100,9 +100,32 @@ services:
     networks:
       - app-network
 
+  # ------------------------------------------------------------------
+  # 6. CADDY (Reverse Proxy)
+  # ------------------------------------------------------------------
+  caddy:
+    image: caddy:2-alpine
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+      - twenty-server
+    networks:
+      - app-network
+
 networks:
   app-network:
     driver: bridge
 
 volumes:
   db-data:
+  caddy_data:
+  caddy_config:
+  server-local-data:
+  docker-data:
