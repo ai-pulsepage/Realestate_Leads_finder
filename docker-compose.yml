@@ -29,6 +29,19 @@ services:
   # ------------------------------------------------------------------
   db:
     image: postgres:16-alpine
+    container_name: shared-db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: real_estate_leads # Default DB
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d # Auto-run migrations
+    ports:
+      - "5432:5432"
+    networks:
+      - app-network
   # ------------------------------------------------------------------
   # 3. TWENTY CRM (Server)
   # ------------------------------------------------------------------
