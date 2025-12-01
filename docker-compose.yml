@@ -55,6 +55,7 @@ services:
     environment:
       - PORT=3000
       - PG_DATABASE_URL=postgresql://postgres:password@db:5432/postgres # Twenty uses 'postgres' DB by default or creates its own
+      - REDIS_URL=redis://redis:6379
       - SERVER_URL=http://localhost:3000
       - FRONT_BASE_URL=http://localhost:3000
       - STORAGE_TYPE=local
@@ -78,6 +79,7 @@ services:
     command: [ "yarn", "worker:prod" ]
     environment:
       - PG_DATABASE_URL=postgresql://postgres:password@db:5432/postgres
+      - REDIS_URL=redis://redis:6379
       - STORAGE_TYPE=local
       - STORAGE_LOCAL_PATH=.local-storage
     depends_on:
