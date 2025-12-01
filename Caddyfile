@@ -1,0 +1,7 @@
+bzleadfinders.com {
+    reverse_proxy app:8080
+}
+
+crm.bzleadfinders.com {
+    reverse_proxy twenty-server:3000
+}
