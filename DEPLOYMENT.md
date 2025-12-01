@@ -45,4 +45,47 @@ The system consists of 5 containers running together:
 
 ## Troubleshooting
 - **Database Connection Errors**: Ensure the `shared-db` container is healthy (`docker ps`).
-- **Port Conflicts**: If port 8080 or 3000 is in use, edit `docker-compose.yml` to map to different ports (e.g., `"8081:8080"`).
+## Option 2: Cloud VM (Recommended for Production)
+
+This method runs the entire suite on a single Google Compute Engine instance (Ubuntu).
+
+### 1. Create a VM Instance
+1.  Go to **Google Cloud Console > Compute Engine**.
+2.  Click **Create Instance**.
+3.  **Machine Type**: `e2-medium` (2 vCPU, 4GB RAM) or larger.
+4.  **Boot Disk**: Ubuntu 22.04 LTS (Standard Persistent Disk, 20GB+).
+5.  **Firewall**: Check "Allow HTTP traffic" and "Allow HTTPS traffic".
+6.  **Create**.
+
+### 2. Open Ports
+By default, Google Cloud blocks port 8080 and 3000. You need to allow them.
+1.  Go to **VPC Network > Firewall**.
+2.  Create Firewall Rule:
+    *   **Name**: `allow-app-ports`
+    *   **Targets**: All instances in the network
+    *   **Source ranges**: `0.0.0.0/0`
+    *   **Protocols and ports**: `tcp:8080`, `tcp:3000`
+
+### 3. Deploy Code
+1.  SSH into your new VM (click "SSH" in the console).
+2.  Clone your repository:
+    ```bash
+    git clone https://github.com/YOUR_USERNAME/YOUR_REPO.git app
+    cd app
+    ```
+3.  Run the setup script:
+    ```bash
+    chmod +x setup-vm.sh
+    ./setup-vm.sh
+    ```
+4.  Edit your `.env` file with your real keys:
+    ```bash
+    nano .env
+    ```
+5.  Restart to apply keys:
+    ```bash
+    sudo docker compose restart
+    ```
+
+### 4. Access
+Your app is now live at `http://YOUR_VM_IP:8080`.
