@@ -50,6 +50,7 @@ services:
     image: twentycrm/twenty:latest
     container_name: twenty-server
     restart: always
+    command: [ "yarn", "start:prod" ]
     ports:
       - "3000:3000"
     environment:
