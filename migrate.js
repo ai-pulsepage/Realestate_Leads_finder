@@ -1,12 +1,20 @@
 const { Pool } = require('pg');
 
 async function runMigrations() {
+  const connectionString = process.env.DATABASE_URL;
+
+  const poolConfig = connectionString
+    ? { connectionString }
+    : {
+      host: '127.0.0.1',
+      port: 5432,
+      database: 'real_estate_leads',
+      user: 'api_user',
+      password: 'E5"j/Fq|@oqY;+#e',
+    };
+
   const pool = new Pool({
-    host: '127.0.0.1',
-    port: 5432,
-    database: 'real_estate_leads',
-    user: 'api_user',
-    password: 'E5"j/Fq|@oqY;+#e',
+    ...poolConfig,
     ssl: false,
     max: 10,
     idleTimeoutMillis: 30000,
