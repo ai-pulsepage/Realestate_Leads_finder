@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import FilterSidebar from '../../components/FilterSidebar';
 import DataTable from '../../components/DataTable';
+import PropertyDetailModal from '../../components/PropertyDetailModal';
 import { propertiesApi } from '../../api/properties';
 
 /**
@@ -12,6 +13,9 @@ const Search = () => {
   const [error, setError] = useState(null);
   const [filters, setFilters] = useState({});
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [viewMode, setViewMode] = useState('cards');
+  const [selectedProperty, setSelectedProperty] = useState(null);
+  const [modalOpen, setModalOpen] = useState(false);
 
   // Load properties based on filters
   const loadProperties = async (searchFilters = {}) => {
@@ -62,9 +66,24 @@ const Search = () => {
 
   // Handle property selection
   const handlePropertyClick = (property) => {
-    // Navigate to property detail page (to be implemented)
-    console.log('Property clicked:', property);
-    // For now, just log. Later this will navigate to detail view
+    setSelectedProperty(property);
+    setModalOpen(true);
+  };
+
+  // Handle modal actions
+  const handleSkipTrace = (property) => {
+    console.log('Skip trace requested for:', property);
+    // TODO: Implement skip trace functionality
+  };
+
+  const handleVoiceCall = (property) => {
+    console.log('Voice call requested for:', property);
+    // TODO: Implement voice call functionality
+  };
+
+  const handleAddToCampaign = (property) => {
+    console.log('Add to campaign requested for:', property);
+    // TODO: Implement add to campaign functionality
   };
 
   // Table columns for potential table view
@@ -114,13 +133,27 @@ const Search = () => {
               )}
             </div>
 
-            {/* View toggle (future enhancement) */}
+            {/* View toggle */}
             <div className="flex items-center space-x-2">
               <span className="text-sm text-gray-600">View:</span>
-              <button className="px-3 py-1 text-sm bg-blue-600 text-white rounded-md">
+              <button
+                onClick={() => setViewMode('cards')}
+                className={`px-3 py-1 text-sm rounded-md ${
+                  viewMode === 'cards'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
                 Cards
               </button>
-              <button className="px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300">
+              <button
+                onClick={() => setViewMode('table')}
+                className={`px-3 py-1 text-sm rounded-md ${
+                  viewMode === 'table'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
                 Table
               </button>
             </div>
@@ -165,13 +198,23 @@ const Search = () => {
               <DataTable
                 data={properties}
                 columns={tableColumns}
-                view="cards"
+                view={viewMode}
                 onRowClick={handlePropertyClick}
                 pageSize={12}
               />
             )}
           </div>
         </div>
+
+        {/* Property Detail Modal */}
+        <PropertyDetailModal
+          property={selectedProperty}
+          isOpen={modalOpen}
+          onClose={() => setModalOpen(false)}
+          onSkipTrace={handleSkipTrace}
+          onVoiceCall={handleVoiceCall}
+          onAddToCampaign={handleAddToCampaign}
+        />
       </div>
     </div>
   );

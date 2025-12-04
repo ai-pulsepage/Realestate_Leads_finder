@@ -49,11 +49,11 @@ try {
   app.use(express.urlencoded({ extended: true }));
 
   // Serve static files from the React app build directory
-  app.use(express.static('client/dist'));
+  app.use(express.static('frontend/dist'));
 
   // Catch all handler: send back React's index.html file for client-side routing
   app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'client/dist/index.html'));
+    res.sendFile(path.join(__dirname, 'frontend/dist/index.html'));
   });
 
   // ... (Health check remains same)

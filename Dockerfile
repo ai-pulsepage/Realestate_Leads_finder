@@ -6,17 +6,17 @@ WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
-COPY client/package*.json ./client/
+COPY frontend/package*.json ./frontend/
 
 # Install dependencies
 RUN npm install
-RUN cd client && npm install
+RUN cd frontend && npm install
 
 # Copy source code
 COPY . .
 
 # Build frontend
-RUN cd client && npm run build
+RUN cd frontend && npm run build
 
 # Expose port
 EXPOSE 8080

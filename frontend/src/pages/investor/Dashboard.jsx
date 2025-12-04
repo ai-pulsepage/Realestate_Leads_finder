@@ -10,7 +10,12 @@ const Dashboard = () => {
     highEquityProperties: 0,
     distressedProperties: 0,
     averageEquity: 0,
-    recentSales: 0
+    recentSales: 0,
+    averagePropertyValue: 0,
+    foreclosureCount: 0,
+    taxLienCount: 0,
+    vacantProperties: 0,
+    olderHomes: 0
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -72,12 +77,29 @@ const Dashboard = () => {
         return saleDate >= sixMonthsAgo;
       }).length;
 
+      // Average property value
+      const propertiesWithValue = allProperties.filter(p => p.assessed_value);
+      const averagePropertyValue = propertiesWithValue.length > 0
+        ? propertiesWithValue.reduce((sum, p) => sum + p.assessed_value, 0) / propertiesWithValue.length
+        : 0;
+
+      // Detailed distress breakdown
+      const foreclosureCount = allProperties.filter(p => p.is_foreclosure).length;
+      const taxLienCount = allProperties.filter(p => p.has_tax_lien).length;
+      const vacantProperties = allProperties.filter(p => p.is_vacant).length;
+      const olderHomes = allProperties.filter(p => p.year_built && p.year_built < 1990).length;
+
       setStats({
         totalProperties,
         highEquityProperties,
         distressedProperties,
         averageEquity: Math.round(averageEquity * 10) / 10, // Round to 1 decimal
-        recentSales
+        recentSales,
+        averagePropertyValue: Math.round(averagePropertyValue),
+        foreclosureCount,
+        taxLienCount,
+        vacantProperties,
+        olderHomes
       });
     } catch (err) {
       console.error('Error loading dashboard stats:', err);
@@ -148,7 +170,7 @@ const Dashboard = () => {
           </p>
         </div>
 
-        {/* Stats Grid */}
+        {/* Primary Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <StatCard
             title="Total Properties"
@@ -160,6 +182,18 @@ const Dashboard = () => {
               </svg>
             }
             color="blue"
+          />
+
+          <StatCard
+            title="Average Property Value"
+            value={`$${(stats.averagePropertyValue / 1000).toFixed(0)}K`}
+            subtitle="Assessed value"
+            icon={
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+              </svg>
+            }
+            color="green"
           />
 
           <StatCard
@@ -175,18 +209,6 @@ const Dashboard = () => {
           />
 
           <StatCard
-            title="Distressed Properties"
-            value={stats.distressedProperties.toLocaleString()}
-            subtitle="Investment opportunities"
-            icon={
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
-              </svg>
-            }
-            color="red"
-          />
-
-          <StatCard
             title="Average Equity"
             value={`${stats.averageEquity}%`}
             subtitle="Across all properties"
@@ -199,25 +221,126 @@ const Dashboard = () => {
           />
         </div>
 
-        {/* Recent Activity */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Recent Activity</h2>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between py-3 border-b border-gray-200">
-              <div>
-                <p className="text-sm font-medium text-gray-900">Properties with Recent Sales</p>
-                <p className="text-sm text-gray-600">Last 6 months</p>
-              </div>
-              <div className="text-2xl font-bold text-gray-900">{stats.recentSales}</div>
-            </div>
+        {/* Distress Analysis Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <StatCard
+            title="Distressed Properties"
+            value={stats.distressedProperties.toLocaleString()}
+            subtitle="Investment opportunities"
+            icon={
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+            }
+            color="red"
+          />
 
-            <div className="flex items-center justify-between py-3">
-              <div>
-                <p className="text-sm font-medium text-gray-900">Market Opportunities</p>
-                <p className="text-sm text-gray-600">High equity + distressed properties</p>
+          <StatCard
+            title="Foreclosure Properties"
+            value={stats.foreclosureCount.toLocaleString()}
+            subtitle="Active foreclosures"
+            icon={
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            }
+            color="red"
+          />
+
+          <StatCard
+            title="Tax Lien Properties"
+            value={stats.taxLienCount.toLocaleString()}
+            subtitle="Tax delinquent"
+            icon={
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+              </svg>
+            }
+            color="orange"
+          />
+
+          <StatCard
+            title="Vacant Properties"
+            value={stats.vacantProperties.toLocaleString()}
+            subtitle="Opportunity potential"
+            icon={
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+            }
+            color="yellow"
+          />
+        </div>
+
+        {/* Market Insights */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          {/* Recent Activity */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Market Activity</h2>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between py-3 border-b border-gray-200">
+                <div>
+                  <p className="text-sm font-medium text-gray-900">Recent Sales</p>
+                  <p className="text-sm text-gray-600">Last 6 months</p>
+                </div>
+                <div className="text-2xl font-bold text-blue-600">{stats.recentSales}</div>
               </div>
-              <div className="text-2xl font-bold text-green-600">
-                {(stats.highEquityProperties + stats.distressedProperties).toLocaleString()}
+
+              <div className="flex items-center justify-between py-3 border-b border-gray-200">
+                <div>
+                  <p className="text-sm font-medium text-gray-900">Older Homes</p>
+                  <p className="text-sm text-gray-600">Built before 1990</p>
+                </div>
+                <div className="text-2xl font-bold text-purple-600">{stats.olderHomes}</div>
+              </div>
+
+              <div className="flex items-center justify-between py-3">
+                <div>
+                  <p className="text-sm font-medium text-gray-900">Total Opportunities</p>
+                  <p className="text-sm text-gray-600">High equity + distressed</p>
+                </div>
+                <div className="text-2xl font-bold text-green-600">
+                  {(stats.highEquityProperties + stats.distressedProperties).toLocaleString()}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Investment Strategy Tips */}
+          <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-lg shadow p-6">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Investment Strategy</h2>
+            <div className="space-y-3">
+              <div className="flex items-start space-x-3">
+                <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
+                <div>
+                  <p className="text-sm font-medium text-gray-900">Focus on High Equity</p>
+                  <p className="text-sm text-gray-600">{stats.highEquityProperties} properties with >30% equity for quick flips</p>
+                </div>
+              </div>
+
+              <div className="flex items-start space-x-3">
+                <div className="w-2 h-2 bg-red-500 rounded-full mt-2"></div>
+                <div>
+                  <p className="text-sm font-medium text-gray-900">Target Distressed Assets</p>
+                  <p className="text-sm text-gray-600">{stats.distressedProperties} properties with foreclosure/tax issues</p>
+                </div>
+              </div>
+
+              <div className="flex items-start space-x-3">
+                <div className="w-2 h-2 bg-green-500 rounded-full mt-2"></div>
+                <div>
+                  <p className="text-sm font-medium text-gray-900">Monitor Recent Sales</p>
+                  <p className="text-sm text-gray-600">{stats.recentSales} sales in last 6 months indicate active market</p>
+                </div>
+              </div>
+
+              <div className="flex items-start space-x-3">
+                <div className="w-2 h-2 bg-purple-500 rounded-full mt-2"></div>
+                <div>
+                  <p className="text-sm font-medium text-gray-900">Consider Rehab Opportunities</p>
+                  <p className="text-sm text-gray-600">{stats.olderHomes} pre-1990 homes may need updates</p>
+                </div>
               </div>
             </div>
           </div>
