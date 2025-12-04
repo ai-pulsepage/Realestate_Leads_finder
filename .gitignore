@@ -3,3 +3,13 @@ node_modules/
 *.log
 .DS_Store
 .zencoder/
+
+# Large data files
+MDPA/
+MiamidadeFTP/
+mock_data/
+*.csv
+*.xls
+*.xlsx
+*.zip
+*.pdf

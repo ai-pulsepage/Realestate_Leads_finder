@@ -24,6 +24,7 @@ try {
   console.log('Loading WebSocket...');
   const WebSocket = require('ws');
   const url = require('url');
+  const path = require('path');
   console.log('✓ WebSocket loaded');
 
   console.log('Loading database config...');
@@ -47,8 +48,12 @@ try {
   }));
   app.use(express.urlencoded({ extended: true }));
 
+  // Serve static files from the React app build directory
+  app.use(express.static('client/dist'));
+
+  // Catch all handler: send back React's index.html file for client-side routing
   app.get('/', (req, res) => {
-    res.json({ status: 'ok', service: 'Real Estate Leads API', version: '1.0.0' });
+    res.sendFile(path.join(__dirname, 'client/dist/index.html'));
   });
 
   // ... (Health check remains same)
