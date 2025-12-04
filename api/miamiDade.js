@@ -27,10 +27,10 @@ async function fetchOfficialRecords(cfn, seq) {
     return JSON.parse(cached);
   }
 
-  const response = await axios.get('https://api.miami-dade.com/OfficialRecords', {
+  const response = await axios.get('https://www2.miamidadeclerk.gov/Developers/OfficialRecords', {
     params: {
-      parameter1: cfn,
-      parameter2: `R${seq}`,
+      cfn: cfn,
+      seq: seq,
       authKey: process.env.MIAMI_DADE_AUTH_KEY
     }
   });

@@ -7,10 +7,20 @@ const router = express.Router();
 // GET /api/properties - Search with filters
 router.get('/', async (req, res) => {
   try {
-    const { zip_code, county, distressed_score_min, property_type } = req.query;
+    const {
+      zip_code,
+      county,
+      distressed_score_min,
+      property_type,
+      minEquity,
+      maxYearBuilt,
+      distressType
+    } = req.query;
+
     let query = 'SELECT * FROM properties WHERE 1=1';
     const params = [];
 
+    // Existing filters
     if (zip_code) {
       params.push(zip_code);
       query += ` AND zip_code = $${params.length}`;
@@ -26,6 +36,54 @@ router.get('/', async (req, res) => {
     if (property_type) {
       params.push(property_type);
       query += ` AND property_type = $${params.length}`;
+    }
+
+    // New complex filters from Sprint 10
+    if (minEquity) {
+      // minEquity: (assessed_value - mortgage_balance) / assessed_value >= threshold
+      const equityThreshold = parseFloat(minEquity);
+      params.push(equityThreshold);
+      query += ` AND (assessed_value - COALESCE(mortgage_balance, 0)) / NULLIF(assessed_value, 0) >= $${params.length}`;
+    }
+
+    if (maxYearBuilt) {
+      // maxYearBuilt: year_built <= threshold (older homes)
+      const yearThreshold = parseInt(maxYearBuilt);
+      params.push(yearThreshold);
+      query += ` AND year_built <= $${params.length}`;
+    }
+
+    if (distressType) {
+      // distressType: filter by specific distress indicators
+      switch (distressType) {
+        case 'foreclosure':
+          query += ` AND is_foreclosure = true`;
+          break;
+        case 'tax_lien':
+          query += ` AND has_tax_lien = true`;
+          break;
+        case 'code_violation':
+          query += ` AND has_code_violation = true`;
+          break;
+        case 'vacant':
+          query += ` AND is_vacant = true`;
+          break;
+        case 'probate':
+          query += ` AND is_probate = true`;
+          break;
+        case 'divorce':
+          query += ` AND is_divorce = true`;
+          break;
+        case 'heirship':
+          query += ` AND is_heirship = true`;
+          break;
+        case 'pre_foreclosure':
+          query += ` AND is_pre_foreclosure = true`;
+          break;
+        default:
+          // Any distress
+          query += ` AND (is_foreclosure = true OR has_tax_lien = true OR has_code_violation = true OR is_vacant = true OR is_probate = true OR is_divorce = true OR is_heirship = true OR is_pre_foreclosure = true)`;
+      }
     }
 
     const result = await req.pool.query(query, params);

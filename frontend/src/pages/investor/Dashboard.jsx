@@ -1,0 +1,260 @@
+import React, { useState, useEffect } from 'react';
+import { propertiesApi } from '../../api/properties';
+
+/**
+ * Investor Dashboard - High-level stats and overview
+ */
+const Dashboard = () => {
+  const [stats, setStats] = useState({
+    totalProperties: 0,
+    highEquityProperties: 0,
+    distressedProperties: 0,
+    averageEquity: 0,
+    recentSales: 0
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    loadDashboardStats();
+  }, []);
+
+  const loadDashboardStats = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Get all properties for analysis
+      const allProperties = await propertiesApi.getProperties();
+
+      // Calculate stats
+      const totalProperties = allProperties.length;
+
+      // High equity properties (>30% equity)
+      const highEquityProperties = allProperties.filter(property => {
+        if (!property.assessed_value) return false;
+        const mortgage = property.mortgage_balance || 0;
+        const equity = property.assessed_value - mortgage;
+        const equityPercent = (equity / property.assessed_value) * 100;
+        return equityPercent > 30;
+      }).length;
+
+      // Distressed properties (any distress flag)
+      const distressedProperties = allProperties.filter(property =>
+        property.is_foreclosure ||
+        property.has_tax_lien ||
+        property.has_code_violation ||
+        property.is_vacant ||
+        property.is_probate ||
+        property.is_divorce ||
+        property.is_heirship ||
+        property.is_pre_foreclosure ||
+        (property.distressed_score && property.distressed_score > 0)
+      ).length;
+
+      // Average equity percentage
+      const propertiesWithEquity = allProperties.filter(p => p.assessed_value);
+      const averageEquity = propertiesWithEquity.length > 0
+        ? propertiesWithEquity.reduce((sum, property) => {
+            const mortgage = property.mortgage_balance || 0;
+            const equity = property.assessed_value - mortgage;
+            const equityPercent = (equity / property.assessed_value) * 100;
+            return sum + equityPercent;
+          }, 0) / propertiesWithEquity.length
+        : 0;
+
+      // Recent sales (last 6 months)
+      const sixMonthsAgo = new Date();
+      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+      const recentSales = allProperties.filter(property => {
+        if (!property.last_sale_date) return false;
+        const saleDate = new Date(property.last_sale_date);
+        return saleDate >= sixMonthsAgo;
+      }).length;
+
+      setStats({
+        totalProperties,
+        highEquityProperties,
+        distressedProperties,
+        averageEquity: Math.round(averageEquity * 10) / 10, // Round to 1 decimal
+        recentSales
+      });
+    } catch (err) {
+      console.error('Error loading dashboard stats:', err);
+      setError('Failed to load dashboard statistics');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const StatCard = ({ title, value, subtitle, icon, color = 'blue' }) => {
+    const colorClasses = {
+      blue: 'bg-blue-500',
+      green: 'bg-green-500',
+      red: 'bg-red-500',
+      yellow: 'bg-yellow-500',
+      purple: 'bg-purple-500'
+    };
+
+    return (
+      <div className="bg-white rounded-lg shadow p-6">
+        <div className="flex items-center">
+          <div className={`p-3 rounded-full ${colorClasses[color]} text-white`}>
+            {icon}
+          </div>
+          <div className="ml-4">
+            <h3 className="text-sm font-medium text-gray-500">{title}</h3>
+            <div className="text-2xl font-bold text-gray-900">{value}</div>
+            {subtitle && <p className="text-sm text-gray-600">{subtitle}</p>}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-red-600 text-lg mb-2">Error Loading Dashboard</div>
+          <div className="text-gray-600 mb-4">{error}</div>
+          <button
+            onClick={loadDashboardStats}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">Investor Dashboard</h1>
+          <p className="mt-2 text-gray-600">
+            Overview of your real estate investment opportunities
+          </p>
+        </div>
+
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <StatCard
+            title="Total Properties"
+            value={stats.totalProperties.toLocaleString()}
+            subtitle="In database"
+            icon={
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+              </svg>
+            }
+            color="blue"
+          />
+
+          <StatCard
+            title="High Equity Properties"
+            value={stats.highEquityProperties.toLocaleString()}
+            subtitle=">30% equity"
+            icon={
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+              </svg>
+            }
+            color="green"
+          />
+
+          <StatCard
+            title="Distressed Properties"
+            value={stats.distressedProperties.toLocaleString()}
+            subtitle="Investment opportunities"
+            icon={
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+            }
+            color="red"
+          />
+
+          <StatCard
+            title="Average Equity"
+            value={`${stats.averageEquity}%`}
+            subtitle="Across all properties"
+            icon={
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+            }
+            color="purple"
+          />
+        </div>
+
+        {/* Recent Activity */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">Recent Activity</h2>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between py-3 border-b border-gray-200">
+              <div>
+                <p className="text-sm font-medium text-gray-900">Properties with Recent Sales</p>
+                <p className="text-sm text-gray-600">Last 6 months</p>
+              </div>
+              <div className="text-2xl font-bold text-gray-900">{stats.recentSales}</div>
+            </div>
+
+            <div className="flex items-center justify-between py-3">
+              <div>
+                <p className="text-sm font-medium text-gray-900">Market Opportunities</p>
+                <p className="text-sm text-gray-600">High equity + distressed properties</p>
+              </div>
+              <div className="text-2xl font-bold text-green-600">
+                {(stats.highEquityProperties + stats.distressedProperties).toLocaleString()}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Quick Actions */}
+        <div className="mt-8 bg-white rounded-lg shadow p-6">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">Quick Actions</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <a
+              href="/investor/search"
+              className="flex items-center justify-center px-4 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+            >
+              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              Search Properties
+            </a>
+
+            <button className="flex items-center justify-center px-4 py-3 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors">
+              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+              Create Campaign
+            </button>
+
+            <button className="flex items-center justify-center px-4 py-3 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors">
+              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+              </svg>
+              View Calculator
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Dashboard;
