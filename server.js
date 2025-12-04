@@ -51,11 +51,6 @@ try {
   // Serve static files from the React app build directory
   app.use(express.static('frontend/dist'));
 
-  // Catch all handler: send back React's index.html file for client-side routing
-  app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'frontend/dist/index.html'));
-  });
-
   // ... (Health check remains same)
 
   console.log('Loading routes...');
@@ -454,6 +449,12 @@ try {
       }
     });
   }
+
+  // Catch all handler: send back React's index.html file for client-side routing
+  // This must be after all API routes
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'frontend/dist/index.html'));
+  });
 
   // Handle WebSocket upgrades
   const server = app.listen(PORT, '0.0.0.0', () => {

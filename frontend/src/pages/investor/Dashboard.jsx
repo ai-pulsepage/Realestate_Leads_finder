@@ -315,7 +315,7 @@ const Dashboard = () => {
                 <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
                 <div>
                   <p className="text-sm font-medium text-gray-900">Focus on High Equity</p>
-                  <p className="text-sm text-gray-600">{stats.highEquityProperties} properties with >30% equity for quick flips</p>
+                  <p className="text-sm text-gray-600">{stats.highEquityProperties} properties with &gt;30% equity for quick flips</p>
                 </div>
               </div>
 
