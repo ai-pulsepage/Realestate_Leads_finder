@@ -12,7 +12,9 @@ export default function ProviderLayout() {
                 <nav className="flex-1 px-4 py-6 space-y-2">
                     <Link to="/provider/dashboard" className="block px-4 py-2 rounded hover:bg-indigo-800">Dashboard</Link>
                     <Link to="/provider/leads" className="block px-4 py-2 rounded hover:bg-indigo-800">New Homeowners</Link>
+                    <Link to="/provider/projects" className="block px-4 py-2 rounded hover:bg-indigo-800">Project Board</Link>
                     <Link to="/provider/bids" className="block px-4 py-2 rounded hover:bg-indigo-800">My Bids</Link>
+                    <Link to="/provider/tools" className="block px-4 py-2 rounded hover:bg-indigo-800">Tools & AI</Link>
                     <Link to="/provider/profile" className="block px-4 py-2 rounded hover:bg-indigo-800">Profile & SEO</Link>
                 </nav>
                 <div className="p-4 border-t border-indigo-800">

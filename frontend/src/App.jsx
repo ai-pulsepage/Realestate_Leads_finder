@@ -5,7 +5,9 @@ import InvestorLayout from './layouts/InvestorLayout';
 import ProviderLayout from './layouts/ProviderLayout';
 import Search from './pages/investor/Search';
 import Dashboard from './pages/investor/Dashboard';
-import Leads from './pages/provider/Leads';
+import ProjectBoard from './pages/provider/ProjectBoard';
+import MyBids from './pages/provider/MyBids';
+import ToolsSettings from './pages/provider/ToolsSettings';
 
 // Placeholder Pages
 const Home = () => (
@@ -93,7 +95,9 @@ function App() {
           <Route index element={<Navigate to="/provider/dashboard" replace />} />
           <Route path="dashboard" element={<ProviderDashboard />} />
           <Route path="leads" element={<Leads />} />
-          <Route path="bids" element={<div>My Bids</div>} />
+          <Route path="projects" element={<ProjectBoard />} />
+          <Route path="bids" element={<MyBids />} />
+          <Route path="tools" element={<ToolsSettings />} />
           <Route path="profile" element={<div>Profile Settings</div>} />
         </Route>
       </Routes>
