@@ -101,7 +101,7 @@ To update the application on your Google Cloud VM with the latest changes (inclu
 
 2.  **Navigate to the Project Directory:**
     ```bash
-    cd ~/realestate-leads-finder
+    cd ~/app
     ```
 
 3.  **Pull the Latest Code:**
@@ -111,12 +111,12 @@ To update the application on your Google Cloud VM with the latest changes (inclu
 
 4.  **Rebuild and Restart Containers:**
     ```bash
-    docker-compose down
-    docker-compose up -d --build
+    docker compose down
+    docker compose up -d --build
     ```
 
 5.  **Verify the Update:**
-    *   Check logs: `docker-compose logs -f app`
+    *   Check logs: `docker compose logs -f app`
     *   Visit the site: `https://your-domain.com`
 
 ### Troubleshooting Updates
