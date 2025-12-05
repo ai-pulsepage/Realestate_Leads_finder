@@ -138,21 +138,19 @@ const Search = () => {
               <span className="text-sm text-gray-600">View:</span>
               <button
                 onClick={() => setViewMode('cards')}
-                className={`px-3 py-1 text-sm rounded-md ${
-                  viewMode === 'cards'
+                className={`px-3 py-1 text-sm rounded-md ${viewMode === 'cards'
                     ? 'bg-blue-600 text-white'
                     : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`}
+                  }`}
               >
                 Cards
               </button>
               <button
                 onClick={() => setViewMode('table')}
-                className={`px-3 py-1 text-sm rounded-md ${
-                  viewMode === 'table'
+                className={`px-3 py-1 text-sm rounded-md ${viewMode === 'table'
                     ? 'bg-blue-600 text-white'
                     : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`}
+                  }`}
               >
                 Table
               </button>
