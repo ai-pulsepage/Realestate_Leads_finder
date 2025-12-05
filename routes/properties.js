@@ -34,8 +34,14 @@ router.get('/', async (req, res) => {
       query += ` AND distressed_score >= $${params.length}`;
     }
     if (property_type) {
-      params.push(property_type);
-      query += ` AND property_type = $${params.length}`;
+      if (property_type === 'Vacant Land') {
+        // Filter for Vacant Residential (0000), Commercial (1000), Industrial (4000), Acreage (9900)
+        // Note: We use LIKE because sometimes codes have leading/trailing spaces or variations
+        query += ` AND (property_type LIKE '00%' OR property_type LIKE '10%' OR property_type LIKE '40%' OR property_type LIKE '99%')`;
+      } else {
+        params.push(property_type);
+        query += ` AND property_type = $${params.length}`;
+      }
     }
 
     // New complex filters from Sprint 10
@@ -97,17 +103,17 @@ router.get('/', async (req, res) => {
 // POST /api/properties - Create new property
 router.post('/', async (req, res) => {
   try {
-    const { 
-      address, 
-      zip_code, 
-      county, 
-      owner_name, 
-      sale_price, 
+    const {
+      address,
+      zip_code,
+      county,
+      owner_name,
+      sale_price,
       property_type,
       latitude,
       longitude,
       distressed_score,
-      source 
+      source
     } = req.body;
 
     const result = await req.pool.query(
@@ -133,11 +139,11 @@ router.get('/:id', async (req, res) => {
       'SELECT * FROM properties WHERE property_id = $1',
       [id]
     );
-    
+
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Property not found' });
     }
-    
+
     res.json(result.rows[0]);
   } catch (err) {
     console.error('Property lookup error:', err);
@@ -149,14 +155,14 @@ router.get('/:id', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { 
-      address, 
-      zip_code, 
-      county, 
-      owner_name, 
-      sale_price, 
+    const {
+      address,
+      zip_code,
+      county,
+      owner_name,
+      sale_price,
       property_type,
-      distressed_score 
+      distressed_score
     } = req.body;
 
     const result = await req.pool.query(
@@ -198,10 +204,10 @@ router.delete('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Property not found' });
     }
 
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       message: 'Property deleted',
-      property_id: result.rows[0].property_id 
+      property_id: result.rows[0].property_id
     });
   } catch (err) {
     console.error('Property delete error:', err);

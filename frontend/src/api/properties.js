@@ -76,23 +76,6 @@ export const propertiesApi = {
    * Get properties for investor search with common filters
    * @param {Object} options - Search options
    * @param {number} options.minEquity - Minimum equity (0-1)
-   * @param {number} options.maxYearBuilt - Maximum year built
-   * @param {string} options.distressType - Distress type
-   * @param {number} options.limit - Result limit
-   * @returns {Promise<Array>} Filtered properties
-   */
-  getInvestorProperties: async (options = {}) => {
-    const filters = {
-      minEquity: options.minEquity,
-      maxYearBuilt: options.maxYearBuilt,
-      distressType: options.distressType,
-      limit: options.limit || 50
-    };
-
-    return propertiesApi.getProperties(filters);
-  },
-
-  /**
    * Get recent sales for service providers (new homeowners)
    * @param {number} monthsSinceSale - Months since sale (default: 6)
    * @returns {Promise<Array>} Recent sales

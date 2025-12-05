@@ -89,3 +89,36 @@ By default, Google Cloud blocks port 8080 and 3000. You need to allow them.
 
 ### 4. Access
 Your app is now live at `http://YOUR_VM_IP:8080`.
+
+## 6. Updating the Production VM
+
+To update the application on your Google Cloud VM with the latest changes (including the new Frontend and Ingestion Engine):
+
+1.  **SSH into the VM:**
+    ```bash
+    gcloud compute ssh "your-vm-name" --zone "us-central1-a"
+    ```
+
+2.  **Navigate to the Project Directory:**
+    ```bash
+    cd ~/realestate-leads-finder
+    ```
+
+3.  **Pull the Latest Code:**
+    ```bash
+    git pull origin main
+    ```
+
+4.  **Rebuild and Restart Containers:**
+    ```bash
+    docker-compose down
+    docker-compose up -d --build
+    ```
+
+5.  **Verify the Update:**
+    *   Check logs: `docker-compose logs -f app`
+    *   Visit the site: `https://your-domain.com`
+
+### Troubleshooting Updates
+*   If you see "Permission denied" errors, ensure you are running docker commands with `sudo` if your user isn't in the docker group.
+*   If the database schema changed (e.g., new columns), the migrations should run automatically on startup. Check the logs to confirm.
