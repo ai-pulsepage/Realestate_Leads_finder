@@ -1,4 +1,3 @@
-```
 import React, { useState, useEffect } from 'react';
 import PropertyCard from '../../components/PropertyCard';
 import { propertiesApi } from '../../api/properties';
@@ -83,7 +82,7 @@ const Leads = () => {
                 <span className="text-red-600">{error}</span>
               ) : (
                 <span className="font-medium bg-green-100 text-green-800 py-1 px-3 rounded-full text-xs">
-                    Found {leads.length} new homeowners
+                  Found {leads.length} new homeowners
                 </span>
               )}
             </div>
@@ -191,4 +190,3 @@ const Leads = () => {
 };
 
 export default Leads;
-```
