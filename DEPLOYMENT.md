@@ -111,14 +111,14 @@ To update the application on your Google Cloud VM with the latest changes (inclu
 
 4.  **Rebuild and Restart Containers:**
     ```bash
-    docker compose down
-    docker compose up -d --build
+    sudo docker compose down
+    sudo docker compose up -d --build
     ```
 
 5.  **Verify the Update:**
-    *   Check logs: `docker compose logs -f app`
+    *   Check logs: `sudo docker compose logs -f app`
     *   Visit the site: `https://your-domain.com`
 
 ### Troubleshooting Updates
-*   If you see "Permission denied" errors, ensure you are running docker commands with `sudo` if your user isn't in the docker group.
+*   If you see "Permission denied" errors, ensure you are running docker commands with `sudo`.
 *   If the database schema changed (e.g., new columns), the migrations should run automatically on startup. Check the logs to confirm.
