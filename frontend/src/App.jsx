@@ -8,7 +8,64 @@ import Dashboard from './pages/investor/Dashboard';
 import Leads from './pages/provider/Leads';
 
 // Placeholder Pages
-const Home = () => <div className="p-8 text-center"><h1 className="text-4xl font-bold mb-4">Welcome to BizLeadFinders</h1><p className="text-xl text-gray-600">The ultimate platform for Real Estate Investors and Service Providers.</p></div>;
+const Home = () => (
+  <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-8">
+    <div className="max-w-4xl w-full text-center space-y-8">
+      <div>
+        <h1 className="text-5xl font-extrabold text-gray-900 mb-4">
+          Welcome to <span className="text-blue-600">BizLeadFinders</span>
+        </h1>
+        <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+          The ultimate platform connecting Real Estate Investors, Service Providers, and Homeowners with data-driven insights.
+        </p>
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-6 mt-12">
+        {/* Investor Card */}
+        <div className="bg-white p-8 rounded-xl shadow-lg hover:shadow-xl transition-shadow border border-gray-100">
+          <div className="h-12 w-12 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-4">
+            <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+            </svg>
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">For Investors</h2>
+          <p className="text-gray-600 mb-6">
+            Find distressed properties, vacant land, and high-equity deals before they hit the market.
+          </p>
+          <a
+            href="/investor/search"
+            className="inline-block w-full py-3 px-6 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+          >
+            Find Deals &rarr;
+          </a>
+        </div>
+
+        {/* Provider Card */}
+        <div className="bg-white p-8 rounded-xl shadow-lg hover:shadow-xl transition-shadow border border-gray-100">
+          <div className="h-12 w-12 bg-green-100 rounded-lg flex items-center justify-center mx-auto mb-4">
+            <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+            </svg>
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">For Service Providers</h2>
+          <p className="text-gray-600 mb-6">
+            Connect with new homeowners and get exclusive leads for your contracting business.
+          </p>
+          <a
+            href="/provider/leads"
+            className="inline-block w-full py-3 px-6 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors"
+          >
+            Get Leads &rarr;
+          </a>
+        </div>
+      </div>
+
+      <div className="mt-12 text-sm text-gray-500">
+        &copy; 2025 BizLeadFinders. All rights reserved.
+      </div>
+    </div>
+  </div>
+);
 const ProviderDashboard = () => <div><h2 className="text-2xl font-bold mb-4">Provider Dashboard</h2><p>Welcome back, Pro.</p></div>;
 
 function App() {
