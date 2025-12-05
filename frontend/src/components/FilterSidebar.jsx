@@ -17,37 +17,7 @@ const FilterSidebar = ({ filters, onFiltersChange, isOpen = true, onClose }) => 
     onFiltersChange(newFilters);
   };
 
-  const handleApplyFilters = () => {
-    onFiltersChange(localFilters);
-    if (onClose) onClose();
-  };
-
-  const handleResetFilters = () => {
-    const resetFilters = {};
-    setLocalFilters(resetFilters);
-    onFiltersChange(resetFilters);
-  };
-
-  const distressTypes = [
-    { value: '', label: 'Any Distress' },
-    { value: 'foreclosure', label: 'Foreclosure' },
-    { value: 'tax_lien', label: 'Tax Lien' },
-    { value: 'code_violation', label: 'Code Violation' },
-    { value: 'vacant', label: 'Vacant' },
-    { value: 'probate', label: 'Probate' },
-    { isOpen && onClose && (
-      <div
-        className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
-        onClick={onClose}
-      />
-    )}
-
-{/* Sidebar */ }
-<div className={`
-        fixed lg:static inset-y-0 left-0 z-50 w-80 bg-white shadow-lg transform transition-transform duration-300 ease-in-out
-        ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-        ${onClose ? 'lg:relative lg:translate-x-0' : ''}
-      `}>
+  `}>
   <div className="h-full overflow-y-auto">
     {/* Header */}
     <div className="p-6 border-b border-gray-200">
