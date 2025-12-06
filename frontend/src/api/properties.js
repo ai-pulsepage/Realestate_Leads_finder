@@ -84,15 +84,19 @@ export const propertiesApi = {
     const cutoffDate = new Date();
     cutoffDate.setMonth(cutoffDate.getMonth() - monthsSinceSale);
 
-    // Note: This would need backend support for date filtering
-    // For now, we'll get all properties and filter client-side
-    const allProperties = await propertiesApi.getProperties();
+    // Format date as YYYY-MM-DD
+    const minDateStr = cutoffDate.toISOString().split('T')[0];
 
-    return allProperties.filter(property => {
-      if (!property.last_sale_date) return false;
-      const saleDate = new Date(property.last_sale_date);
-      return saleDate >= cutoffDate;
-    });
+    try {
+      // Use the new backend filter
+      const response = await apiClient.get('/properties', {
+        params: { min_last_sale_date: minDateStr }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching recent sales:', error);
+      throw error;
+    }
   }
 };
 
