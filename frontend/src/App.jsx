@@ -8,6 +8,7 @@ import Dashboard from './pages/investor/Dashboard';
 import ProjectBoard from './pages/provider/ProjectBoard';
 import MyBids from './pages/provider/MyBids';
 import ToolsSettings from './pages/provider/ToolsSettings';
+import Leads from './pages/provider/Leads';
 
 // Placeholder Pages
 const Home = () => (
