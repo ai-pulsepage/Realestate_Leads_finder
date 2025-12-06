@@ -15,6 +15,7 @@ export default function ProviderLayout() {
                     <Link to="/provider/projects" className="block px-4 py-2 rounded hover:bg-indigo-800">Project Board</Link>
                     <Link to="/provider/bids" className="block px-4 py-2 rounded hover:bg-indigo-800">My Bids</Link>
                     <Link to="/provider/tools" className="block px-4 py-2 rounded hover:bg-indigo-800">Tools & AI</Link>
+                    <Link to="/provider/marketing" className="block px-4 py-2 rounded hover:bg-indigo-800">Email Marketing</Link>
                     <Link to="/provider/profile" className="block px-4 py-2 rounded hover:bg-indigo-800">Profile & SEO</Link>
                 </nav>
                 <div className="p-4 border-t border-indigo-800">

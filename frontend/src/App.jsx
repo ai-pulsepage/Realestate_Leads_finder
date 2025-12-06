@@ -9,6 +9,8 @@ import ProjectBoard from './pages/provider/ProjectBoard';
 import MyBids from './pages/provider/MyBids';
 import ToolsSettings from './pages/provider/ToolsSettings';
 import Leads from './pages/provider/Leads';
+import ProviderDashboard from './pages/provider/Dashboard';
+import Marketing from './pages/provider/Marketing';
 
 // Placeholder Pages
 const Home = () => (
@@ -69,7 +71,7 @@ const Home = () => (
     </div>
   </div>
 );
-const ProviderDashboard = () => <div><h2 className="text-2xl font-bold mb-4">Provider Dashboard</h2><p>Welcome back, Pro.</p></div>;
+
 
 function App() {
   return (
@@ -99,6 +101,7 @@ function App() {
           <Route path="projects" element={<ProjectBoard />} />
           <Route path="bids" element={<MyBids />} />
           <Route path="tools" element={<ToolsSettings />} />
+          <Route path="marketing" element={<Marketing />} />
           <Route path="profile" element={<div>Profile Settings</div>} />
         </Route>
       </Routes>
