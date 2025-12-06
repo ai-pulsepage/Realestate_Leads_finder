@@ -92,6 +92,13 @@ router.get('/', async (req, res) => {
       }
     }
 
+    // [NEW] Filter by Recent Sales (for Leads page)
+    const { min_last_sale_date } = req.query;
+    if (min_last_sale_date) {
+      params.push(min_last_sale_date);
+      query += ` AND last_sale_date >= $${params.length}`;
+    }
+
     const result = await req.pool.query(query, params);
     res.json(result.rows);
   } catch (err) {
