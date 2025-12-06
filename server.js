@@ -113,6 +113,14 @@ try {
   const adminAiRoutes = require('./routes/admin-ai'); // [AI PERSONA GENERATOR]
   console.log('  ✓ Admin AI');
 
+  console.log('  Loading projects...');
+  const projectsRoutes = require('./routes/projects');
+  console.log('  ✓ Projects');
+
+  console.log('  Loading bids...');
+  const bidsRoutes = require('./routes/bids');
+  console.log('  ✓ Bids');
+
   console.log('Mounting routes...');
   // Public Routes
   app.use('/api/voice-ai', checkDatabase, voiceAiRoutes); // Voice AI must be public for Twilio
@@ -122,6 +130,8 @@ try {
   app.use('/api/users', checkDatabase, authenticateToken, usersRoutes);
   app.use('/api/stripe', checkDatabase, authenticateToken, stripeRoutes);
   app.use('/api/profiles', checkDatabase, authenticateToken, profilesRoutes);
+  app.use('/api/projects', checkDatabase, authenticateToken, projectsRoutes); // [NEW]
+  app.use('/api/bids', checkDatabase, authenticateToken, bidsRoutes); // [NEW]
   app.use('/api/ai', checkDatabase, authenticateToken, aiRoutes);
   app.use('/api/admin', checkDatabase, authenticateToken, adminRoutes);
   app.use('/api/saved-leads', checkDatabase, authenticateToken, savedLeadsRoutes);
