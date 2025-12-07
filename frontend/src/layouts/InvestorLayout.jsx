@@ -12,7 +12,10 @@ export default function InvestorLayout() {
                 <nav className="flex-1 px-4 py-6 space-y-2">
                     <Link to="/investor/dashboard" className="block px-4 py-2 rounded hover:bg-slate-800">Dashboard</Link>
                     <Link to="/investor/search" className="block px-4 py-2 rounded hover:bg-slate-800">Lead Search (Grid)</Link>
+                    <Link to="/investor/fsbo" className="block px-4 py-2 rounded hover:bg-slate-800">FSBO Leads</Link>
                     <Link to="/investor/campaigns" className="block px-4 py-2 rounded hover:bg-slate-800">Campaigns</Link>
+                    <Link to="/investor/marketing" className="block px-4 py-2 rounded hover:bg-slate-800">Email Marketing</Link>
+                    <Link to="/investor/tools" className="block px-4 py-2 rounded hover:bg-slate-800">Tools & AI</Link>
                     <Link to="/investor/calculator" className="block px-4 py-2 rounded hover:bg-slate-800">Flipping Calculator</Link>
                 </nav>
                 <div className="p-4 border-t border-slate-800">

@@ -11,6 +11,9 @@ import ToolsSettings from './pages/provider/ToolsSettings';
 import Leads from './pages/provider/Leads';
 import ProviderDashboard from './pages/provider/Dashboard';
 import Marketing from './pages/provider/Marketing';
+import Profile from './pages/provider/Profile';
+import Waitlist from './pages/Waitlist';
+import FSBO from './pages/investor/FSBO';
 
 // Placeholder Pages
 const Home = () => (
@@ -74,22 +77,51 @@ const Home = () => (
 
 
 function App() {
+  // Subdomain Routing Logic
+  const hostname = window.location.hostname;
+  const isAppSubdomain = hostname.startsWith('app.');
+
+  // If on main domain (bizleadfinders.com or www.), show Landing Page by default
+  // If on app subdomain (app.), show App Routes
+
+  // However, we need to handle the routing carefully.
+  // Strategy: 
+  // 1. If 'app.', render the full App Router.
+  // 2. If root/www, render Landing Page at root path, but redirect others to app? 
+  //    Actually, user wants root -> Landing Page.
+
+  // Simplified for this requirement:
+  // We will use a wrapper to determine what to show based on domain AND path.
+
   return (
     <Router>
       <Routes>
-        {/* Public Routes */}
-        <Route path="/" element={<PublicLayout />}>
-          <Route index element={<Home />} />
-          <Route path="login" element={<div className="p-8">Login Page</div>} />
-          <Route path="signup" element={<div className="p-8">Signup Page</div>} />
-        </Route>
+        {/* 
+            DOMAIN BASED ROUTING WRAPPER 
+            If on root/www and path is /, show Waitlist (Landing Page).
+            If on app., show Home/Login/Dashboard.
+        */}
+
+        {/* Landing Page (Root Domain Only) */}
+        <Route path="/" element={
+          !isAppSubdomain ? <Waitlist /> : <Navigate to="/login" replace />
+        } />
+
+        {/* Public Routes (Shared or App specific) */}
+        <Route path="/login" element={<div className="p-8">Login Page</div>} />
+        <Route path="/signup" element={<div className="p-8">Signup Page</div>} />
+
+        {/* App Routes (Redirect to app subdomain if accessed from root? Optional, but good for separation) */}
 
         {/* Investor Routes */}
         <Route path="/investor" element={<InvestorLayout />}>
           <Route index element={<Navigate to="/investor/dashboard" replace />} />
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="search" element={<Search />} />
+          <Route path="fsbo" element={<FSBO />} />
           <Route path="campaigns" element={<div>Campaigns</div>} />
+          <Route path="marketing" element={<Marketing />} />
+          <Route path="tools" element={<ToolsSettings />} />
           <Route path="calculator" element={<div>Flipping Calculator</div>} />
         </Route>
 
@@ -102,8 +134,11 @@ function App() {
           <Route path="bids" element={<MyBids />} />
           <Route path="tools" element={<ToolsSettings />} />
           <Route path="marketing" element={<Marketing />} />
-          <Route path="profile" element={<div>Profile Settings</div>} />
+          <Route path="profile" element={<Profile />} />
         </Route>
+
+        {/* Explicit Waitlist Route (Accessible from anywhere if needed, or just root) */}
+        <Route path="/waitlist" element={<Waitlist />} />
       </Routes>
     </Router>
   );

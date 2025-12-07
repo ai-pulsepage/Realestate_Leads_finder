@@ -121,9 +121,19 @@ try {
   const bidsRoutes = require('./routes/bids');
   console.log('  ✓ Bids');
 
+  console.log('  Loading waitlist...');
+  const waitlistRoutes = require('./routes/waitlist');
+  console.log('  ✓ Waitlist');
+
+  console.log('  Loading wallet...');
+  const walletRoutes = require('./routes/wallet');
+  console.log('  ✓ Wallet');
+
   console.log('Mounting routes...');
   // Public Routes
   app.use('/api/voice-ai', checkDatabase, voiceAiRoutes); // Voice AI must be public for Twilio
+  app.use('/api/waitlist', checkDatabase, waitlistRoutes);
+  app.use('/api/wallet', checkDatabase, authenticateToken, walletRoutes);
 
   // Protected Routes (Require Auth)
   app.use('/api/properties', checkDatabase, authenticateToken, propertiesRoutes);

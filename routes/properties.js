@@ -8,96 +8,72 @@ const router = express.Router();
 router.get('/', async (req, res) => {
   try {
     const {
-      zip_code,
-      county,
-      distressed_score_min,
-      property_type,
-      minEquity,
-      maxYearBuilt,
-      distressType
+      min_price, max_price, city, zip, min_last_sale_date,
+      distressed_score_min, property_type, minEquity, maxYearBuilt, distressType
     } = req.query;
-
-    let query = 'SELECT * FROM properties WHERE 1=1';
+    
+    // Base Query on Real Data
+    let query = `
+      SELECT p.*, 
+             l.lis_pendens_filed, l.tax_lien_filed, l.foreclosure_status, 
+             l.divorce_filing, l.bankruptcy_filing
+      FROM properties_real p
+      LEFT JOIN property_legal_status l ON p.parcel_id = l.parcel_id
+      WHERE 1=1
+    `;
     const params = [];
-
-    // Existing filters
-    if (zip_code) {
-      params.push(zip_code);
-      query += ` AND zip_code = $${params.length}`;
+    
+    // Price Filter (Appraised Value)
+    if (min_price) {
+      params.push(min_price);
+      query += ` AND p.appraised_value >= $${params.length}`;
     }
-    if (county) {
-      params.push(county);
-      query += ` AND county = $${params.length}`;
-    }
-    if (distressed_score_min) {
-      params.push(distressed_score_min);
-      query += ` AND distressed_score >= $${params.length}`;
-    }
-    if (property_type) {
-      if (property_type === 'Vacant Land') {
-        // Filter for Vacant Residential (0000), Commercial (1000), Industrial (4000), Acreage (9900)
-        // Note: We use LIKE because sometimes codes have leading/trailing spaces or variations
-        query += ` AND (property_type LIKE '00%' OR property_type LIKE '10%' OR property_type LIKE '40%' OR property_type LIKE '99%')`;
-      } else {
-        params.push(property_type);
-        query += ` AND property_type = $${params.length}`;
-      }
+    if (max_price) {
+      params.push(max_price);
+      query += ` AND p.appraised_value <= $${params.length}`;
     }
 
-    // New complex filters from Sprint 10
-    if (minEquity) {
-      // minEquity: (assessed_value - mortgage_balance) / assessed_value >= threshold
-      const equityThreshold = parseFloat(minEquity);
-      params.push(equityThreshold);
-      query += ` AND (assessed_value - COALESCE(mortgage_balance, 0)) / NULLIF(assessed_value, 0) >= $${params.length}`;
+    // Location Filters
+    if (city) {
+      params.push(`%${city}%`);
+      query += ` AND p.address_city ILIKE $${params.length}`;
+    }
+    if (zip) {
+      params.push(zip);
+      query += ` AND p.address_zip = $${params.length}`;
     }
 
-    if (maxYearBuilt) {
-      // maxYearBuilt: year_built <= threshold (older homes)
-      const yearThreshold = parseInt(maxYearBuilt);
-      params.push(yearThreshold);
-      query += ` AND year_built <= $${params.length}`;
+    // Recent Sales
+    if (min_last_sale_date) {
+      params.push(min_last_sale_date);
+      query += ` AND p.last_sale_date >= $${params.length}`;
     }
 
+    // Distress Filters (Legal Status)
     if (distressType) {
-      // distressType: filter by specific distress indicators
       switch (distressType) {
         case 'foreclosure':
-          query += ` AND is_foreclosure = true`;
+          query += ` AND l.foreclosure_status IS NOT NULL AND l.foreclosure_status != 'none'`;
           break;
         case 'tax_lien':
-          query += ` AND has_tax_lien = true`;
+          query += ` AND l.tax_lien_filed = true`;
           break;
-        case 'code_violation':
-          query += ` AND has_code_violation = true`;
-          break;
-        case 'vacant':
-          query += ` AND is_vacant = true`;
-          break;
-        case 'probate':
-          query += ` AND is_probate = true`;
+        case 'lis_pendens':
+          query += ` AND l.lis_pendens_filed = true`;
           break;
         case 'divorce':
-          query += ` AND is_divorce = true`;
+          query += ` AND l.divorce_filing = true`;
           break;
-        case 'heirship':
-          query += ` AND is_heirship = true`;
-          break;
-        case 'pre_foreclosure':
-          query += ` AND is_pre_foreclosure = true`;
+        case 'bankruptcy':
+          query += ` AND l.bankruptcy_filing = true`;
           break;
         default:
           // Any distress
-          query += ` AND (is_foreclosure = true OR has_tax_lien = true OR has_code_violation = true OR is_vacant = true OR is_probate = true OR is_divorce = true OR is_heirship = true OR is_pre_foreclosure = true)`;
+          query += ` AND (l.lis_pendens_filed = true OR l.tax_lien_filed = true OR l.divorce_filing = true OR l.bankruptcy_filing = true)`;
       }
     }
 
-    // [NEW] Filter by Recent Sales (for Leads page)
-    const { min_last_sale_date } = req.query;
-    if (min_last_sale_date) {
-      params.push(min_last_sale_date);
-      query += ` AND last_sale_date >= $${params.length}`;
-    }
+    query += ` ORDER BY p.created_at DESC LIMIT 50`;
 
     const result = await req.pool.query(query, params);
     res.json(result.rows);
@@ -142,8 +118,10 @@ router.post('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    // Try real table first, fallback to mock if needed? 
+    // For now, let's assume we want real data.
     const result = await req.pool.query(
-      'SELECT * FROM properties WHERE property_id = $1',
+      'SELECT * FROM properties_real WHERE property_id = $1',
       [id]
     );
 

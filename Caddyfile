@@ -1,4 +1,4 @@
-bizleadfinders.com {
+bizleadfinders.com, www.bizleadfinders.com {
     reverse_proxy app:8080
 }
 
