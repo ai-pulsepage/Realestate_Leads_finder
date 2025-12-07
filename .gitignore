@@ -7,8 +7,8 @@ node_modules/
 # Large data files
 MDPA/
 MiamidadeFTP/
-mock_data/
-*.csv
+# mock_data/  <-- Allowed for seed data
+# *.csv       <-- Allowed for seed data
 *.xls
 *.xlsx
 *.zip
