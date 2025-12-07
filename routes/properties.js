@@ -11,10 +11,14 @@ router.get('/', async (req, res) => {
       min_price, max_price, city, zip, min_last_sale_date,
       distressed_score_min, property_type, minEquity, maxYearBuilt, distressType
     } = req.query;
-    
+
     // Base Query on Real Data
     let query = `
-      SELECT p.*, 
+      SELECT p.*,
+             p.address_street as address,
+             p.address_street as full_address,
+             p.appraised_value as assessed_value,
+             p.appraised_value as sale_price, -- Fallback if sale_price is needed
              l.lis_pendens_filed, l.tax_lien_filed, l.foreclosure_status, 
              l.divorce_filing, l.bankruptcy_filing
       FROM properties_real p
@@ -22,7 +26,7 @@ router.get('/', async (req, res) => {
       WHERE 1=1
     `;
     const params = [];
-    
+
     // Price Filter (Appraised Value)
     if (min_price) {
       params.push(min_price);
