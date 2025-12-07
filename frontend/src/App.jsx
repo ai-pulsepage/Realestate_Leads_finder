@@ -13,6 +13,8 @@ import ProviderDashboard from './pages/provider/Dashboard';
 import Marketing from './pages/provider/Marketing';
 import Profile from './pages/provider/Profile';
 import Waitlist from './pages/Waitlist';
+import LandingPageRevised from './pages/LandingPageRevised';
+import Login from './pages/Login';
 import FSBO from './pages/investor/FSBO';
 
 // Placeholder Pages
@@ -81,37 +83,23 @@ function App() {
   const hostname = window.location.hostname;
   const isAppSubdomain = hostname.startsWith('app.');
 
-  // If on main domain (bizleadfinders.com or www.), show Landing Page by default
-  // If on app subdomain (app.), show App Routes
-
-  // However, we need to handle the routing carefully.
-  // Strategy: 
-  // 1. If 'app.', render the full App Router.
-  // 2. If root/www, render Landing Page at root path, but redirect others to app? 
-  //    Actually, user wants root -> Landing Page.
-
-  // Simplified for this requirement:
-  // We will use a wrapper to determine what to show based on domain AND path.
-
   return (
     <Router>
       <Routes>
         {/* 
             DOMAIN BASED ROUTING WRAPPER 
-            If on root/www and path is /, show Waitlist (Landing Page).
-            If on app., show Home/Login/Dashboard.
+            If on root/www and path is /, show LandingPageRevised (Waitlist V2).
+            If on app., show Home (User Selection Page).
         */}
 
-        {/* Landing Page (Root Domain Only) */}
+        {/* Root Route Handlers */}
         <Route path="/" element={
-          !isAppSubdomain ? <Waitlist /> : <Navigate to="/login" replace />
+          !isAppSubdomain ? <LandingPageRevised /> : <Home />
         } />
 
-        {/* Public Routes (Shared or App specific) */}
-        <Route path="/login" element={<div className="p-8">Login Page</div>} />
+        {/* Public Routes */}
+        <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<div className="p-8">Signup Page</div>} />
-
-        {/* App Routes (Redirect to app subdomain if accessed from root? Optional, but good for separation) */}
 
         {/* Investor Routes */}
         <Route path="/investor" element={<InvestorLayout />}>
