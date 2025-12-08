@@ -7,10 +7,20 @@ const { JWT_SECRET } = require('../middleware/auth');
 // POST /api/auth/signup
 router.post('/signup', async (req, res) => {
     try {
-        const { email, password } = req.body;
+        const { email, password, role } = req.body;
 
         if (!email || !password) {
             return res.status(400).json({ error: 'Email and password are required' });
+        }
+
+        // Validate Role (Optional but good practice)
+        const validRoles = ['investor', 'contractor', 'provider', 'agent'];
+        let subscriptionTier = 'basic';
+
+        if (role) {
+            const normalizedRole = role.toLowerCase();
+            if (normalizedRole === 'contractor') subscriptionTier = 'provider';
+            else if (validRoles.includes(normalizedRole)) subscriptionTier = normalizedRole;
         }
 
         // Check if user exists
@@ -25,14 +35,14 @@ router.post('/signup', async (req, res) => {
 
         // Create User
         const result = await req.pool.query(
-            'INSERT INTO users (email, password_hash) VALUES ($1, $2) RETURNING user_id, email, created_at',
-            [email, passwordHash]
+            'INSERT INTO users (email, password_hash, subscription_tier) VALUES ($1, $2, $3) RETURNING user_id, email, subscription_tier, created_at',
+            [email, passwordHash, subscriptionTier]
         );
 
         const user = result.rows[0];
 
         // Generate Token
-        const token = jwt.sign({ userId: user.user_id, email: user.email }, JWT_SECRET, { expiresIn: '24h' });
+        const token = jwt.sign({ userId: user.user_id, email: user.email, role: user.subscription_tier }, JWT_SECRET, { expiresIn: '24h' });
 
         res.status(201).json({
             message: 'User created successfully',

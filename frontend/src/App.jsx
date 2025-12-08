@@ -15,6 +15,7 @@ import Profile from './pages/provider/Profile';
 import Waitlist from './pages/Waitlist';
 import LandingPageRevised from './pages/LandingPageRevised';
 import Login from './pages/Login';
+import Signup from './pages/Signup';
 import FSBO from './pages/investor/FSBO';
 
 // Placeholder Pages
@@ -99,7 +100,7 @@ function App() {
 
         {/* Public Routes */}
         <Route path="/login" element={<Login />} />
-        <Route path="/signup" element={<div className="p-8">Signup Page</div>} />
+        <Route path="/signup" element={<Signup />} />
 
         {/* Investor Routes */}
         <Route path="/investor" element={<InvestorLayout />}>
