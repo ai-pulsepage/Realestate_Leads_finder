@@ -606,7 +606,7 @@ const WaitlistModal = ({ isOpen, onClose }) => {
 
     // Form logic state
     const [status, setStatus] = useState('idle');
-    const [formData, setFormData] = useState({ name: '', email: '', role: 'investor' });
+    const [formData, setFormData] = useState({ full_name: '', email: '', role: 'investor', consent_given: false });
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -630,19 +630,28 @@ const WaitlistModal = ({ isOpen, onClose }) => {
                     <div className="text-center py-8">
                         <div className="text-5xl mb-4">🎉</div>
                         <h3 className="text-2xl font-bold">You're In!</h3>
-                        <p className="text-gray-600">Watch your email for the beta invite.</p>
+                        <p className="text-gray-600 mb-4">We've reserved your spot.</p>
+                        <p className="text-sm text-gray-500">Watch your inbox for exclusive updates and marketing materials.</p>
+                        <button onClick={onClose} className="mt-6 text-blue-600 font-bold hover:underline">Close</button>
                     </div>
                 ) : (
                     <>
                         <h3 className="text-2xl font-bold mb-2">Join Early Access</h3>
                         <p className="text-gray-600 mb-6">Lock in your founding member token rates.</p>
+
+                        {status === 'error' && (
+                            <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm">
+                                Something went wrong. Please try again.
+                            </div>
+                        )}
+
                         <form onSubmit={handleSubmit} className="space-y-4">
                             <input
                                 className="w-full border p-3 rounded-lg"
                                 placeholder="Full Name"
                                 required
-                                value={formData.name}
-                                onChange={e => setFormData({ ...formData, name: e.target.value })}
+                                value={formData.full_name}
+                                onChange={e => setFormData({ ...formData, full_name: e.target.value })}
                             />
                             <input
                                 className="w-full border p-3 rounded-lg"
@@ -660,8 +669,26 @@ const WaitlistModal = ({ isOpen, onClose }) => {
                                 <option value="investor">Real Estate Investor</option>
                                 <option value="contractor">Service Contractor</option>
                             </select>
-                            <button className="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700">
-                                {status === 'submitting' ? 'Joining...' : 'Join Waitlist'}
+
+                            <div className="flex items-start gap-3 mt-2">
+                                <input
+                                    type="checkbox"
+                                    id="consent"
+                                    required
+                                    checked={formData.consent_given}
+                                    onChange={e => setFormData({ ...formData, consent_given: e.target.checked })}
+                                    className="mt-1 h-4 w-4 text-blue-600 rounded border-gray-300"
+                                />
+                                <label htmlFor="consent" className="text-xs text-gray-500 text-left">
+                                    I agree to join the waitlist and receive marketing emails/updates from BizLeadFinders. You can unsubscribe at any time.
+                                </label>
+                            </div>
+
+                            <button
+                                disabled={status === 'submitting'}
+                                className="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 disabled:opacity-70 disabled:cursor-not-allowed"
+                            >
+                                {status === 'submitting' ? 'Reserving Spot...' : 'Join Waitlist'}
                             </button>
                         </form>
                     </>
