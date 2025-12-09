@@ -702,17 +702,26 @@ router.post('/status-callback', async (req, res) => {
 
 router.post('/gemini-response', async (req, res) => {
   try {
-    console.log('🤖 Processing with Gemini AI');
+    console.log('🤖 Processing with Gemini AI v2 (Tool Calling)');
 
     const twiml = new twilio.twiml.VoiceResponse();
     const callSid = req.body.CallSid;
     const twilioNumber = req.body.To;
 
-    // Get subscriber and conversation history
+    // Get subscriber, voice settings, and conversation history
     const subscriberQuery = await req.pool.query(`
-      SELECT u.user_id, skb.knowledge_data
+      SELECT 
+        u.user_id, 
+        u.google_refresh_token,
+        vs.inbound_config,
+        vs.outbound_config,
+        vs.calendar_connected,
+        skb.knowledge_data,
+        sp.business_name
       FROM users u
+      LEFT JOIN voice_settings vs ON u.user_id = vs.user_id
       LEFT JOIN subscriber_knowledge_base skb ON u.user_id = skb.user_id
+      LEFT JOIN subscriber_profiles sp ON u.user_id = sp.user_id
       WHERE u.twilio_phone_number = $1
     `, [twilioNumber]);
 
@@ -722,81 +731,119 @@ router.post('/gemini-response', async (req, res) => {
       return res.send(twiml.toString());
     }
 
-    const userId = subscriberQuery.rows[0].user_id;
-    const knowledgeBase = subscriberQuery.rows[0].knowledge_data || {};
+    const userData = subscriberQuery.rows[0];
+    const knowledgeBase = userData.knowledge_data || {};
+    const calendarConnected = userData.calendar_connected || false;
 
-    // Get conversation history
+    // Get conversation history and check if outbound
     const historyQuery = await req.pool.query(
-      'SELECT conversation_transcript FROM ai_voice_call_logs WHERE call_sid = $1',
+      'SELECT conversation_transcript, is_outbound FROM ai_voice_call_logs WHERE call_sid = $1',
       [callSid]
     );
 
-    const conversationHistory = historyQuery.rows.length > 0
-      ? historyQuery.rows[0].conversation_transcript
-      : '';
+    const callLog = historyQuery.rows[0] || {};
+    const conversationHistory = callLog.conversation_transcript || '';
+    const isOutbound = callLog.is_outbound || false;
 
     // Get last user query from transcript
     const lines = conversationHistory.split('\n').filter(l => l.trim());
     const lastLine = lines[lines.length - 1] || '';
     const userQuery = lastLine.replace('Caller:', '').trim();
 
-    // Generate AI response
-    const aiResponse = await geminiService.generateVoiceResponse({
+    // Define available tools if calendar connected
+    const tools = [];
+    if (calendarConnected) {
+      tools.push({
+        name: "check_availability",
+        description: "Check calendar for available appointment slots",
+        parameters: { date_range: "string" }
+      });
+      tools.push({
+        name: "book_appointment",
+        description: "Book a confirmed appointment time",
+        parameters: { datetime: "string", customer_name: "string" }
+      });
+    }
+
+    // Generate AI response (now returns { text, toolCall })
+    const aiResult = await geminiService.generateVoiceResponse({
       userQuery,
       conversationHistory,
       knowledgeBase,
-      intent: 'general_inquiry'
+      intent: 'general_inquiry',
+      isOutbound,
+      tools: tools.length > 0 ? tools : null
     });
 
-    // Update transcript with AI response
-    await req.pool.query(`
-      UPDATE ai_voice_call_logs
-      SET conversation_transcript = COALESCE(conversation_transcript, '') || $1 || '\n'
-      WHERE call_sid = $2
-    `, [`AI: ${aiResponse}`, callSid]);
+    // Handle tool calls
+    if (aiResult.toolCall) {
+      const { tool, args } = aiResult.toolCall;
 
-    // Speak the AI response
-    twiml.say({
-      voice: 'Polly.Joanna',
-      language: 'en-US'
-    }, aiResponse);
+      if (tool === 'check_availability') {
+        // TODO: Integrate with Google Calendar API
+        const mockSlots = "Tuesday at 2pm, Wednesday at 10am, or Friday at 4pm";
+        twiml.say({ voice: 'Polly.Joanna' },
+          `Let me check the calendar... I have openings on ${mockSlots}. Which works for you?`);
 
-    // Check if response indicates need for human transfer
-    if (geminiService.detectTransferRequest(aiResponse)) {
-      twiml.say({
-        voice: 'Polly.Joanna',
-        language: 'en-US'
-      }, 'Let me connect you with someone who can help.');
+        await req.pool.query(`
+          UPDATE ai_voice_call_logs
+          SET conversation_transcript = COALESCE(conversation_transcript, '') || $1 || '\n'
+          WHERE call_sid = $2
+        `, [`TOOL: check_availability -> ${mockSlots}`, callSid]);
+      }
+      else if (tool === 'book_appointment') {
+        twiml.say({ voice: 'Polly.Joanna' },
+          `Great! I have you down for ${args.datetime}. I'll send you a confirmation text shortly.`);
 
-      // In production, this would dial the subscriber's phone
-      // For now, just acknowledge
-      twiml.say({
-        voice: 'Polly.Joanna',
-        language: 'en-US'
-      }, 'I\'m transferring you now.');
+        await req.pool.query(`
+          UPDATE ai_voice_call_logs
+          SET conversation_transcript = COALESCE(conversation_transcript, '') || $1 || '\n'
+          WHERE call_sid = $2
+        `, [`TOOL: book_appointment -> ${args.datetime}`, callSid]);
 
-      // Placeholder for actual transfer
-      twiml.hangup();
-    } else {
-      // Continue conversation
-      twiml.say({
-        voice: 'Polly.Joanna',
-        language: 'en-US'
-      }, 'Is there anything else I can help you with?');
+        // TODO: Trigger SMS confirmation via Twilio
+      }
 
+      // Continue listening
       const gather = twiml.gather({
         input: 'speech',
         action: '/api/voice-ai/process-response',
         method: 'POST',
         timeout: 5,
-        speechTimeout: 'auto',
-        language: 'en-US'
+        speechTimeout: 'auto'
       });
+      gather.say({ voice: 'Polly.Joanna' }, 'Is there anything else I can help you with?');
+    }
+    else {
+      // Normal text response
+      const aiResponse = aiResult.text || "I didn't catch that. Could you repeat?";
 
-      gather.say({
-        voice: 'Polly.Joanna',
-        language: 'en-US'
-      }, 'Please tell me what you need help with.');
+      // Update transcript with AI response
+      await req.pool.query(`
+        UPDATE ai_voice_call_logs
+        SET conversation_transcript = COALESCE(conversation_transcript, '') || $1 || '\n'
+        WHERE call_sid = $2
+      `, [`AI: ${aiResponse}`, callSid]);
+
+      // Speak the AI response
+      twiml.say({ voice: 'Polly.Joanna', language: 'en-US' }, aiResponse);
+
+      // Check if response indicates need for human transfer
+      if (geminiService.detectTransferRequest && geminiService.detectTransferRequest(aiResponse)) {
+        twiml.say({ voice: 'Polly.Joanna' }, 'Let me connect you with someone who can help.');
+        twiml.hangup();
+      } else {
+        // Continue conversation
+        const gather = twiml.gather({
+          input: 'speech',
+          action: '/api/voice-ai/process-response',
+          method: 'POST',
+          timeout: 5,
+          speechTimeout: 'auto',
+          language: 'en-US'
+        });
+        gather.say({ voice: 'Polly.Joanna' }, 'Is there anything else?');
+      }
     }
 
     res.type('text/xml');
@@ -804,10 +851,8 @@ router.post('/gemini-response', async (req, res) => {
 
   } catch (error) {
     console.error('❌ Error in Gemini response:', error);
-
     const twiml = new twilio.twiml.VoiceResponse();
     twiml.say('Sorry, I had trouble processing that. Please try again.');
-
     res.type('text/xml');
     res.send(twiml.toString());
   }

@@ -99,70 +99,96 @@ const ToolsSettings = () => {
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
                     <div className="flex justify-between items-start mb-6">
                         <div>
-                            <h2 className="text-xl font-bold text-gray-900">Voice AI Receptionist</h2>
+                            <h2 className="text-xl font-bold text-gray-900">Voice AI 2.0</h2>
                             <p className="text-gray-600 text-sm mt-1">
-                                Configure your AI agent to answer missed calls and qualify leads.
+                                Dual-Agent System: Inbound Receptionist & Outbound Sales
                             </p>
                         </div>
-                        <div className="flex items-center">
-                            <span className={`mr-3 text-sm font-medium ${aiEnabled ? 'text-green-600' : 'text-gray-500'}`}>
-                                {aiEnabled ? 'Active' : 'Disabled'}
-                            </span>
-                            <button
-                                onClick={() => setAiEnabled(!aiEnabled)}
-                                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${aiEnabled ? 'bg-green-600' : 'bg-gray-200'}`}
-                            >
-                                <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${aiEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
-                            </button>
-                        </div>
-                    </div>
-
-                    <div className="grid md:grid-cols-2 gap-6">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Twilio Number (Inbound)</label>
-                            <div className="flex">
-                                <input
-                                    type="text"
-                                    value={twilioNumber}
-                                    readOnly
-                                    className="flex-1 rounded-l-md border-gray-300 bg-gray-50 text-gray-500 sm:text-sm p-2 border"
-                                />
+                        <div className="flex items-center gap-4">
+                            {/* Calendar Status */}
+                            <div className="flex items-center text-sm border-r pr-4 border-gray-200">
+                                <span className="w-2 h-2 rounded-full bg-gray-300 mr-2"></span>
+                                <span className="text-gray-500">Calendar: Not Connected</span>
+                                <button className="ml-2 text-blue-600 font-medium hover:text-blue-800">Connect</button>
+                            </div>
+                            {/* Toggle */}
+                            <div className="flex items-center">
+                                <span className={`mr-3 text-sm font-medium ${aiEnabled ? 'text-green-600' : 'text-gray-500'}`}>
+                                    {aiEnabled ? 'Active' : 'Disabled'}
+                                </span>
                                 <button
-                                    onClick={() => setShowBuyModal(true)}
-                                    className="bg-gray-100 px-4 py-2 border border-l-0 border-gray-300 rounded-r-md text-sm font-medium text-gray-700 hover:bg-gray-200"
+                                    onClick={() => setAiEnabled(!aiEnabled)}
+                                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${aiEnabled ? 'bg-green-600' : 'bg-gray-200'}`}
                                 >
-                                    Change
+                                    <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${aiEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
                                 </button>
                             </div>
                         </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Call Forwarding Number</label>
-                            <input
-                                type="text"
-                                value={forwardingNumber}
-                                onChange={(e) => setForwardingNumber(e.target.value)}
-                                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
-                            />
-                            <p className="mt-1 text-xs text-gray-500">Calls forwarded here when AI is off.</p>
-                        </div>
                     </div>
 
-                    <div className="mt-6">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Initial Greeting</label>
-                        <input
-                            type="text"
-                            value={greeting}
-                            onChange={(e) => setGreeting(e.target.value)}
-                            className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border mb-4"
-                        />
+                    {/* Tabs */}
+                    <div className="flex border-b border-gray-200 mb-6">
+                        <button className="px-4 py-2 text-sm font-medium text-blue-600 border-b-2 border-blue-600">
+                            📞 Inbound Receptionist
+                        </button>
+                        <button className="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700">
+                            🚀 Outbound Sales
+                        </button>
+                    </div>
 
-                        <label className="block text-sm font-medium text-gray-700 mb-2">AI Knowledge Base</label>
-                        <textarea
-                            rows={4}
-                            className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
-                            defaultValue="We are a premier roofing company in Miami. We handle shingle, tile, and metal roofs. Our hours are 8am-6pm Mon-Fri. We offer free estimates."
-                        />
-                        <p className="mt-1 text-xs text-gray-500">Teach your AI about your business, hours, and services.</p>
+                    {/* Inbound Tab Content */}
+                    <div className="space-y-4">
+                        <div className="grid md:grid-cols-2 gap-6">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Twilio Number (Inbound)</label>
+                                <div className="flex">
+                                    <input
+                                        type="text"
+                                        value={twilioNumber}
+                                        readOnly
+                                        className="flex-1 rounded-l-md border-gray-300 bg-gray-50 text-gray-500 sm:text-sm p-2 border"
+                                    />
+                                    <button
+                                        onClick={() => setShowBuyModal(true)}
+                                        className="bg-gray-100 px-4 py-2 border border-l-0 border-gray-300 rounded-r-md text-sm font-medium text-gray-700 hover:bg-gray-200"
+                                    >
+                                        Change
+                                    </button>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Fallback Forwarding</label>
+                                <input
+                                    type="text"
+                                    value={forwardingNumber}
+                                    onChange={(e) => setForwardingNumber(e.target.value)}
+                                    className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
+                                    placeholder="+1 (305) 555-0100"
+                                />
+                                <p className="mt-1 text-xs text-gray-500">Calls go here if AI is off or caller requests transfer.</p>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Initial Greeting</label>
+                            <input
+                                type="text"
+                                value={greeting}
+                                onChange={(e) => setGreeting(e.target.value)}
+                                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
+                                placeholder="Thanks for calling [Company]. How can I help you today?"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Knowledge Base</label>
+                            <textarea
+                                rows={4}
+                                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
+                                defaultValue="We are a premier roofing company in Miami. We handle shingle, tile, and metal roofs. Our hours are 8am-6pm Mon-Fri. We offer free estimates."
+                            />
+                            <p className="mt-1 text-xs text-gray-500">Teach your AI about your business, hours, and services.</p>
+                        </div>
                     </div>
                 </div>
 
