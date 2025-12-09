@@ -21,53 +21,84 @@ const getGenAI = () => {
  * @param {string} params.conversationHistory - Previous conversation
  * @param {Object} params.knowledgeBase - Subscriber's company info
  * @param {string} params.intent - Detected intent (optional)
- * @returns {Promise<string>} - AI-generated response
+ * @param {boolean} params.isOutbound - Whether this is an outbound call
+ * @param {Array} params.tools - Available tools for function calling
+ * @returns {Promise<Object>} - { text: string, toolCall: Object|null }
  */
 async function generateVoiceResponse({
   userQuery,
   conversationHistory = '',
   knowledgeBase = {},
-  intent = 'general_inquiry'
+  intent = 'general_inquiry',
+  isOutbound = false,
+  tools = null
 }) {
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-latest' });
+    const genAI = getGenAI();
+    if (!genAI) throw new Error('Gemini not initialized');
+
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
     // Build context-aware prompt
-    const systemPrompt = buildSystemPrompt(knowledgeBase, intent);
+    const systemPrompt = buildSystemPrompt(knowledgeBase, intent, isOutbound);
+
+    // Tool instructions if tools provided
+    let toolInstructions = '';
+    if (tools && tools.length > 0) {
+      toolInstructions = `
+AVAILABLE TOOLS:
+${JSON.stringify(tools, null, 2)}
+
+WHEN TO USE TOOLS:
+- If user asks about availability -> Use "check_availability"
+- If user confirms a time -> Use "book_appointment"
+
+OUTPUT FORMAT:
+- For speech: Return plain text
+- For tool use: Return ONLY JSON: {"tool": "tool_name", "args": {...}}
+`;
+    }
+
     const fullPrompt = `
 ${systemPrompt}
+
+${toolInstructions}
+
+GUARDRAILS:
+- Do NOT make up prices or availability
+- Do NOT promise specific outcomes unless verified by a tool
+- Keep responses under 40 words for natural pacing
+- Be warm and professional
 
 CONVERSATION HISTORY:
 ${conversationHistory || 'No previous conversation'}
 
-CALLER'S CURRENT QUESTION:
-${userQuery}
-
-INSTRUCTIONS:
-- Provide a helpful, professional response as if you're speaking on the phone
-- Keep response under 100 words
-- Use conversational tone, not formal writing
-- If caller asks about properties, pricing, or services, use the knowledge base
-- If you need more info, ask a clarifying question
-- If caller wants to speak to someone, acknowledge and say you'll connect them
+CALLER: "${userQuery}"
 
 RESPONSE:`;
 
     const result = await model.generateContent(fullPrompt);
-    const response = result.response.text();
+    const text = result.response.text().trim();
 
-    console.log('🤖 Gemini response generated:', {
-      userQuery: userQuery.substring(0, 50),
-      responseLength: response.length
-    });
+    // Check for Tool Call (JSON response)
+    if (text.startsWith('{') && text.endsWith('}')) {
+      try {
+        const toolJson = JSON.parse(text);
+        if (toolJson.tool) {
+          console.log('🛠️ Tool call requested:', toolJson);
+          return { text: null, toolCall: toolJson };
+        }
+      } catch (e) {
+        // Not valid JSON, treat as text
+      }
+    }
 
-    return response.trim();
+    console.log('🤖 Gemini response:', text.substring(0, 100));
+    return { text: text, toolCall: null };
 
   } catch (error) {
     console.error('❌ Gemini API error:', error);
-
-    // Fallback response
-    return "I apologize, but I'm having trouble processing that right now. Would you like me to connect you with someone who can help?";
+    return { text: "I apologize, could you say that again?", toolCall: null };
   }
 }
 

@@ -1,62 +1,73 @@
 const express = require('express');
 const router = express.Router();
+const { pool } = require('../config/database');
 
 // POST /api/bids - Submit a bid
 router.post('/', async (req, res) => {
+    const client = await pool.connect();
     try {
-        const { project_id, provider_id, amount, proposal_text, estimated_days } = req.body;
+        const { project_id, amount, proposal_text } = req.body;
+        const provider_id = req.user.user_id;
+        const BID_COST = 5; // Fixed cost for MVP
 
-        const result = await req.pool.query(
-            `INSERT INTO bids (project_id, provider_id, amount, proposal_text, estimated_days)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING *`,
-            [project_id, provider_id, amount, proposal_text, estimated_days]
+        await client.query('BEGIN');
+
+        // 1. Check Token Balance
+        const userRes = await client.query('SELECT token_balance FROM users WHERE user_id = $1', [provider_id]);
+        const currentBalance = userRes.rows[0].token_balance || 0;
+
+        if (currentBalance < BID_COST) {
+            await client.query('ROLLBACK');
+            return res.status(403).json({ error: 'Insufficient tokens', required: BID_COST, current: currentBalance });
+        }
+
+        // 2. Deduct Tokens
+        await client.query('UPDATE users SET token_balance = token_balance - $1 WHERE user_id = $2', [BID_COST, provider_id]);
+
+        // 3. Insert Bid
+        const result = await client.query(
+            `INSERT INTO bids (project_id, provider_id, amount, proposal_text)
+             VALUES ($1, $2, $3, $4)
+             RETURNING *`,
+            [project_id, provider_id, amount, proposal_text]
         );
 
-        // TODO: Trigger email notification to homeowner here
+        // 4. Log Transaction (Optional but recommended)
+        // await client.query(...)
 
-        res.json(result.rows[0]);
+        await client.query('COMMIT');
+
+        res.status(201).json({
+            message: 'Bid submitted successfully',
+            bid: result.rows[0],
+            new_balance: currentBalance - BID_COST
+        });
+
     } catch (err) {
-        console.error('Bid submission error:', err);
+        await client.query('ROLLBACK');
+        console.error(err);
         res.status(500).json({ error: 'Failed to submit bid' });
+    } finally {
+        client.release();
     }
 });
 
-// GET /api/bids/provider/:provider_id - Get my bids
-router.get('/provider/:provider_id', async (req, res) => {
+// GET /api/bids/my-bids - List bids by provider
+router.get('/my-bids', async (req, res) => {
     try {
-        const { provider_id } = req.params;
-        const result = await req.pool.query(
-            `SELECT b.*, p.title as project_title, p.status as project_status
-       FROM bids b
-       JOIN projects p ON b.project_id = p.project_id
-       WHERE b.provider_id = $1
-       ORDER BY b.created_at DESC`,
+        const provider_id = req.user.user_id;
+        const result = await pool.query(
+            `SELECT b.*, p.title as project_title, p.status as project_status 
+             FROM bids b
+             JOIN projects p ON b.project_id = p.project_id
+             WHERE b.provider_id = $1
+             ORDER BY b.created_at DESC`,
             [provider_id]
         );
         res.json(result.rows);
     } catch (err) {
-        console.error('My bids error:', err);
-        res.status(500).json({ error: 'Failed to fetch bids' });
-    }
-});
-
-// GET /api/bids/project/:project_id - Get bids for a project (Homeowner view)
-router.get('/project/:project_id', async (req, res) => {
-    try {
-        const { project_id } = req.params;
-        const result = await req.pool.query(
-            `SELECT b.*, pr.business_name as provider_name, pr.avatar_url, pr.license_verified
-       FROM bids b
-       JOIN profiles pr ON b.provider_id = pr.profile_id
-       WHERE b.project_id = $1
-       ORDER BY b.amount ASC`,
-            [project_id]
-        );
-        res.json(result.rows);
-    } catch (err) {
-        console.error('Project bids error:', err);
-        res.status(500).json({ error: 'Failed to fetch bids' });
+        console.error(err);
+        res.status(500).json({ error: 'Server error' });
     }
 });
 

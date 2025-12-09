@@ -5,9 +5,36 @@ import { Link } from 'react-router-dom';
  * Email Marketing Page
  * Hybrid Approach: AI Assistant + Playbooks + Data
  */
+import apiClient from '../../api/client';
+
+/**
+ * Email Marketing Page
+ * Hybrid Approach: AI Assistant + Playbooks + Data
+ */
 const Marketing = () => {
     const [activeTab, setActiveTab] = useState('dashboard');
     const [showImportModal, setShowImportModal] = useState(false);
+    const [uploadStatus, setUploadStatus] = useState('idle'); // idle, uploading, success, error
+
+    const handleFileUpload = async (file) => {
+        setUploadStatus('uploading');
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            await apiClient.post('/crm/import', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            setUploadStatus('success');
+            setTimeout(() => {
+                setShowImportModal(false);
+                setUploadStatus('idle');
+            }, 1500);
+        } catch (error) {
+            console.error('Upload Error:', error);
+            setUploadStatus('error');
+        }
+    };
 
     return (
         <div className="min-h-screen bg-gray-50 p-8">
@@ -32,8 +59,8 @@ const Marketing = () => {
                             key={tab}
                             onClick={() => setActiveTab(tab)}
                             className={`pb-4 px-2 text-sm font-medium capitalize transition-colors ${activeTab === tab
-                                    ? 'border-b-2 border-blue-600 text-blue-600'
-                                    : 'text-gray-500 hover:text-gray-700'
+                                ? 'border-b-2 border-blue-600 text-blue-600'
+                                : 'text-gray-500 hover:text-gray-700'
                                 }`}
                         >
                             {tab}
@@ -52,10 +79,57 @@ const Marketing = () => {
                 <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50">
                     <div className="bg-white rounded-lg max-w-md w-full p-6">
                         <h3 className="text-lg font-bold text-gray-900 mb-4">Import Contacts</h3>
-                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center mb-6 hover:bg-gray-50 cursor-pointer">
+                        <div
+                            onDrop={async (e) => {
+                                e.preventDefault();
+                                const file = e.dataTransfer.files[0];
+                                if (file && file.type === 'text/csv') {
+                                    // Handle File Upload
+                                    const formData = new FormData();
+                                    formData.append('file', file);
+
+                                    try {
+                                        // Import apiClient if not present or use fetch (using fetch for simple FormData example if apiClient not easy to verify)
+                                        // Assuming apiClient is available or can be imported. 
+                                        // Let's use direct axios or fetch with auth header for safety in this snippet scope, or better:
+                                        // We will trigger a function.
+                                        await handleFileUpload(file);
+                                    } catch (err) {
+                                        console.error(err);
+                                        alert('Upload failed');
+                                    }
+                                }
+                            }}
+                            onDragOver={(e) => e.preventDefault()}
+                            className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center mb-6 hover:bg-gray-50 cursor-pointer relative"
+                        >
+                            <input
+                                type="file"
+                                accept=".csv"
+                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                onChange={(e) => {
+                                    if (e.target.files[0]) handleFileUpload(e.target.files[0]);
+                                }}
+                            />
                             <div className="text-4xl mb-2">📂</div>
                             <p className="text-sm text-gray-600">Drag & drop CSV file here</p>
                             <p className="text-xs text-gray-400 mt-1">or click to browse</p>
+                        </div>
+
+                        <div className="bg-blue-50 p-4 rounded-lg mb-6 text-left">
+                            <div className="flex items-center gap-2 mb-2 text-blue-800 font-bold text-sm">
+                                <span>ℹ️</span> CSV Format Guide
+                            </div>
+                            <p className="text-xs text-blue-700 mb-2">Ensure your file has these headers:</p>
+                            <div className="flex flex-wrap gap-2">
+                                <span className="bg-white px-2 py-1 rounded border border-blue-200 text-xs font-mono text-blue-600">Name</span>
+                                <span className="bg-white px-2 py-1 rounded border border-blue-200 text-xs font-mono text-blue-600">Email</span>
+                                <span className="bg-white px-2 py-1 rounded border border-blue-200 text-xs font-mono text-blue-600">Phone</span>
+                                <span className="bg-white px-2 py-1 rounded border border-blue-200 text-xs font-mono text-blue-600">Address</span>
+                                <span className="bg-white px-2 py-1 rounded border border-blue-200 text-xs font-mono text-blue-600">City</span>
+                                <span className="bg-white px-2 py-1 rounded border border-blue-200 text-xs font-mono text-blue-600">State</span>
+                                <span className="bg-white px-2 py-1 rounded border border-blue-200 text-xs font-mono text-blue-600">Zip</span>
+                            </div>
                         </div>
                         <div className="flex justify-end gap-3">
                             <button
@@ -65,10 +139,12 @@ const Marketing = () => {
                                 Cancel
                             </button>
                             <button
-                                onClick={() => setShowImportModal(false)}
-                                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md"
+                                disabled={uploadStatus === 'uploading'}
+                                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md disabled:opacity-50"
                             >
-                                Upload List
+                                {uploadStatus === 'uploading' ? 'Uploading...' :
+                                    uploadStatus === 'success' ? 'Done!' :
+                                        uploadStatus === 'error' ? 'Failed' : 'Select File above'}
                             </button>
                         </div>
                     </div>
@@ -203,8 +279,8 @@ const CampaignRow = ({ name, status, sent, opens, date }) => (
         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{name}</td>
         <td className="px-6 py-4 whitespace-nowrap">
             <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${status === 'Sent' ? 'bg-green-100 text-green-800' :
-                    status === 'Draft' ? 'bg-gray-100 text-gray-800' :
-                        'bg-blue-100 text-blue-800'
+                status === 'Draft' ? 'bg-gray-100 text-gray-800' :
+                    'bg-blue-100 text-blue-800'
                 }`}>
                 {status}
             </span>

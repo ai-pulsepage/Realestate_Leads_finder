@@ -56,9 +56,14 @@ try {
   console.log('Loading routes...');
 
   // Auth Routes (Public)
+  // Auth Routes (Public)
   const authRoutes = require('./routes/auth');
   app.use('/api/auth', checkDatabase, authRoutes);
   console.log('  ✓ Auth');
+
+  const crmRoutes = require('./routes/crm');
+  app.use('/api/crm', checkDatabase, authenticateToken, crmRoutes);
+  console.log('  ✓ CRM');
 
   // Middleware
   const { authenticateToken } = require('./middleware/auth');
@@ -67,6 +72,14 @@ try {
   const tokenPricingRoutes = require('./routes/token-pricing');
   app.use('/api/token-pricing', checkDatabase, authenticateToken, tokenPricingRoutes);
   console.log('  ✓ Token Pricing');
+
+  const projectsRoutes = require('./routes/projects');
+  app.use('/api/projects', checkDatabase, authenticateToken, projectsRoutes);
+  console.log('  ✓ Projects');
+
+  const bidsRoutes = require('./routes/bids');
+  app.use('/api/bids', checkDatabase, authenticateToken, bidsRoutes);
+  console.log('  ✓ Bids');
 
   console.log('  Loading properties...');
   const propertiesRoutes = require('./routes/properties');
