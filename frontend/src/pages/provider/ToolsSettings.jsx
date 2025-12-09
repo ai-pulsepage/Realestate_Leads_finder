@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Phone, PhoneOutgoing, PhoneIncoming, Calendar, Wallet,
     Mail, Settings, Save, Loader2, CheckCircle, AlertCircle,
     Mic, Volume2, Clock, Users, MessageSquare, Zap
 } from 'lucide-react';
+
+const API_BASE = import.meta.env.VITE_API_URL || '';
 
 /**
  * Tools & Settings - Premium Configuration Dashboard
@@ -15,39 +17,96 @@ const ToolsSettings = () => {
     const [activeTab, setActiveTab] = useState('inbound'); // 'inbound' | 'outbound'
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
 
     // Inbound Config
     const [inboundConfig, setInboundConfig] = useState({
-        twilioNumber: '+1 (786) 555-0199',
-        forwardingNumber: '+1 (555) 123-4567',
+        twilioNumber: '',
+        forwardingNumber: '',
         greeting: "Hello! You've reached [Company Name]. How can we help you today?",
-        knowledgeBase: "We are a premier roofing company in Miami. We handle shingle, tile, and metal roofs. Our hours are 8am-6pm Mon-Fri. We offer free estimates.",
-        afterHours: 'voicemail' // 'voicemail' | 'ai' | 'forward'
+        knowledgeBase: "",
+        afterHours: 'voicemail'
     });
 
     // Outbound Config
     const [outboundConfig, setOutboundConfig] = useState({
         agentName: 'Sarah',
-        objective: 'qualify_lead', // 'qualify_lead' | 'book_appointment' | 'custom'
-        openingScript: "Hi, this is Sarah from [Company]. I'm following up on your recent inquiry about our services. Do you have a moment?",
-        voicemailDrop: "Hi, this is Sarah from [Company]. I was calling about your home project. Please call us back at [Number]. Thanks!",
+        objective: 'qualify_lead',
+        openingScript: "Hi, this is Sarah from [Company]. I'm following up on your recent inquiry.",
+        voicemailDrop: "Hi, this is Sarah from [Company]. Please call us back. Thanks!",
         detectVoicemail: true,
         maxAttempts: 3
     });
 
     // Modals
     const [showBuyModal, setShowBuyModal] = useState(false);
+    const [calendarConnected, setCalendarConnected] = useState(false);
 
-    // Calendar Status (would come from API)
-    const calendarConnected = false;
+    // Load settings on mount
+    useEffect(() => {
+        const loadSettings = async () => {
+            try {
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${API_BASE}/api/admin/dual-agent-settings`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    if (data.inbound_config && Object.keys(data.inbound_config).length > 0) {
+                        setInboundConfig(prev => ({ ...prev, ...data.inbound_config }));
+                    }
+                    if (data.outbound_config && Object.keys(data.outbound_config).length > 0) {
+                        setOutboundConfig(prev => ({ ...prev, ...data.outbound_config }));
+                    }
+                    if (data.twilio_number) {
+                        setInboundConfig(prev => ({ ...prev, twilioNumber: data.twilio_number }));
+                    }
+                    setCalendarConnected(data.calendar_connected || false);
+                }
+            } catch (err) {
+                console.error('Failed to load settings:', err);
+            } finally {
+                setLoading(false);
+            }
+        };
+        loadSettings();
+    }, []);
 
     const handleSave = async () => {
         setSaving(true);
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        setSaving(false);
-        setSaved(true);
-        setTimeout(() => setSaved(false), 3000);
+        setError(null);
+
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch(`${API_BASE}/api/admin/dual-agent-settings`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    inbound_config: inboundConfig,
+                    outbound_config: outboundConfig,
+                    ai_enabled: aiEnabled
+                })
+            });
+
+            const data = await res.json();
+
+            if (!data.success) {
+                throw new Error(data.message || 'Failed to save');
+            }
+
+            setSaved(true);
+            setTimeout(() => setSaved(false), 3000);
+        } catch (err) {
+            console.error('Save error:', err);
+            setError(err.message);
+        } finally {
+            setSaving(false);
+        }
     };
 
     return (
@@ -66,8 +125,8 @@ const ToolsSettings = () => {
                         onClick={handleSave}
                         disabled={saving}
                         className={`inline-flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-white shadow-lg transition-all duration-300 ${saved
-                                ? 'bg-green-500 shadow-green-500/25'
-                                : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-blue-500/25 hover:shadow-xl hover:scale-105'
+                            ? 'bg-green-500 shadow-green-500/25'
+                            : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-blue-500/25 hover:shadow-xl hover:scale-105'
                             }`}
                     >
                         {saving ? (
@@ -112,8 +171,8 @@ const ToolsSettings = () => {
                                 <div
                                     key={pack.name}
                                     className={`relative rounded-xl p-5 text-center transition-all duration-300 cursor-pointer ${pack.popular
-                                            ? 'bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-500 shadow-lg shadow-blue-500/10'
-                                            : 'border-2 border-gray-100 hover:border-blue-300 hover:shadow-lg'
+                                        ? 'bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-500 shadow-lg shadow-blue-500/10'
+                                        : 'border-2 border-gray-100 hover:border-blue-300 hover:shadow-lg'
                                         }`}
                                 >
                                     {pack.popular && (
@@ -125,8 +184,8 @@ const ToolsSettings = () => {
                                     <div className="text-3xl font-bold text-blue-600 my-2">{pack.tokens.toLocaleString()}</div>
                                     <div className="text-gray-500 mb-4">${pack.price}.00</div>
                                     <button className={`w-full py-2.5 rounded-lg font-semibold transition-all ${pack.popular
-                                            ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:shadow-lg'
-                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                        ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:shadow-lg'
+                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                                         }`}>
                                         Buy Now
                                     </button>
@@ -207,8 +266,8 @@ const ToolsSettings = () => {
                             <button
                                 onClick={() => setActiveTab('inbound')}
                                 className={`flex items-center gap-2 px-6 py-4 font-semibold transition-all border-b-2 ${activeTab === 'inbound'
-                                        ? 'text-violet-600 border-violet-600 bg-violet-50'
-                                        : 'text-gray-500 border-transparent hover:text-gray-700 hover:bg-gray-50'
+                                    ? 'text-violet-600 border-violet-600 bg-violet-50'
+                                    : 'text-gray-500 border-transparent hover:text-gray-700 hover:bg-gray-50'
                                     }`}
                             >
                                 <PhoneIncoming className="w-5 h-5" />
@@ -217,8 +276,8 @@ const ToolsSettings = () => {
                             <button
                                 onClick={() => setActiveTab('outbound')}
                                 className={`flex items-center gap-2 px-6 py-4 font-semibold transition-all border-b-2 ${activeTab === 'outbound'
-                                        ? 'text-violet-600 border-violet-600 bg-violet-50'
-                                        : 'text-gray-500 border-transparent hover:text-gray-700 hover:bg-gray-50'
+                                    ? 'text-violet-600 border-violet-600 bg-violet-50'
+                                    : 'text-gray-500 border-transparent hover:text-gray-700 hover:bg-gray-50'
                                     }`}
                             >
                                 <PhoneOutgoing className="w-5 h-5" />
@@ -316,8 +375,8 @@ const ToolsSettings = () => {
                                                 key={option.value}
                                                 onClick={() => setInboundConfig({ ...inboundConfig, afterHours: option.value })}
                                                 className={`flex items-center justify-center gap-2 p-4 rounded-lg border-2 transition-all ${inboundConfig.afterHours === option.value
-                                                        ? 'border-violet-500 bg-violet-50 text-violet-700'
-                                                        : 'border-gray-200 hover:border-gray-300 text-gray-600'
+                                                    ? 'border-violet-500 bg-violet-50 text-violet-700'
+                                                    : 'border-gray-200 hover:border-gray-300 text-gray-600'
                                                     }`}
                                             >
                                                 <option.icon className="w-5 h-5" />
@@ -401,8 +460,8 @@ const ToolsSettings = () => {
                                         onChange={(e) => setOutboundConfig({ ...outboundConfig, voicemailDrop: e.target.value })}
                                         disabled={!outboundConfig.detectVoicemail}
                                         className={`w-full rounded-lg border-2 px-4 py-3 transition resize-none ${outboundConfig.detectVoicemail
-                                                ? 'border-orange-200 bg-white focus:border-orange-400'
-                                                : 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
+                                            ? 'border-orange-200 bg-white focus:border-orange-400'
+                                            : 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
                                             }`}
                                         placeholder="Hi, this is [Name] from [Company]. Please call us back at..."
                                     />
@@ -420,8 +479,8 @@ const ToolsSettings = () => {
                                                 key={num}
                                                 onClick={() => setOutboundConfig({ ...outboundConfig, maxAttempts: num })}
                                                 className={`w-14 h-14 rounded-lg border-2 font-bold text-lg transition-all ${outboundConfig.maxAttempts === num
-                                                        ? 'border-violet-500 bg-violet-50 text-violet-700'
-                                                        : 'border-gray-200 hover:border-gray-300 text-gray-600'
+                                                    ? 'border-violet-500 bg-violet-50 text-violet-700'
+                                                    : 'border-gray-200 hover:border-gray-300 text-gray-600'
                                                     }`}
                                             >
                                                 {num}

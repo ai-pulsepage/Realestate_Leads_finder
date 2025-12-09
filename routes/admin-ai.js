@@ -181,4 +181,93 @@ router.put('/voice-settings/:user_id', async (req, res) => {
     }
 });
 
+// ============================================================
+// GET /api/admin/dual-agent-settings
+// Fetch inbound/outbound voice agent configurations
+// ============================================================
+router.get('/dual-agent-settings', async (req, res) => {
+    try {
+        // Get user from auth middleware or query param
+        const userId = req.user?.user_id || req.query.user_id;
+
+        if (!userId) {
+            return res.status(400).json({ success: false, message: 'User ID required' });
+        }
+
+        const result = await req.pool.query(`
+            SELECT 
+                vs.inbound_config,
+                vs.outbound_config,
+                vs.calendar_connected,
+                u.twilio_phone_number
+            FROM voice_settings vs
+            JOIN users u ON vs.user_id = u.user_id
+            WHERE vs.user_id = $1
+        `, [userId]);
+
+        if (result.rows.length === 0) {
+            // Return defaults if no settings exist
+            return res.json({
+                success: true,
+                inbound_config: {},
+                outbound_config: {},
+                calendar_connected: false,
+                twilio_number: null
+            });
+        }
+
+        const row = result.rows[0];
+        res.json({
+            success: true,
+            inbound_config: row.inbound_config || {},
+            outbound_config: row.outbound_config || {},
+            calendar_connected: row.calendar_connected || false,
+            twilio_number: row.twilio_phone_number
+        });
+
+    } catch (error) {
+        console.error('❌ Error fetching dual-agent settings:', error);
+        res.status(500).json({ success: false, message: 'Error fetching settings', error: error.message });
+    }
+});
+
+// ============================================================
+// PUT /api/admin/dual-agent-settings
+// Save inbound/outbound voice agent configurations
+// ============================================================
+router.put('/dual-agent-settings', async (req, res) => {
+    try {
+        const userId = req.user?.user_id || req.body.user_id;
+        const { inbound_config, outbound_config, ai_enabled } = req.body;
+
+        if (!userId) {
+            return res.status(400).json({ success: false, message: 'User ID required' });
+        }
+
+        // Upsert voice_settings
+        const result = await req.pool.query(`
+            INSERT INTO voice_settings (user_id, inbound_config, outbound_config)
+            VALUES ($1, $2, $3)
+            ON CONFLICT (user_id) 
+            DO UPDATE SET 
+                inbound_config = COALESCE($2, voice_settings.inbound_config),
+                outbound_config = COALESCE($3, voice_settings.outbound_config),
+                updated_at = NOW()
+            RETURNING *
+        `, [userId, JSON.stringify(inbound_config || {}), JSON.stringify(outbound_config || {})]);
+
+        console.log('✅ Dual-agent settings saved for:', userId);
+
+        res.json({
+            success: true,
+            message: 'Settings saved successfully',
+            data: result.rows[0]
+        });
+
+    } catch (error) {
+        console.error('❌ Error saving dual-agent settings:', error);
+        res.status(500).json({ success: false, message: 'Error saving settings', error: error.message });
+    }
+});
+
 module.exports = router;
