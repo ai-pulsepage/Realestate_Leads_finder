@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocat
 import PublicLayout from './layouts/PublicLayout';
 import InvestorLayout from './layouts/InvestorLayout';
 import ProviderLayout from './layouts/ProviderLayout';
+import AdminLayout from './layouts/AdminLayout';
 import Search from './pages/investor/Search';
 import Dashboard from './pages/investor/Dashboard';
 import ProjectBoard from './pages/provider/ProjectBoard';
@@ -18,6 +19,8 @@ import Login from './pages/Login';
 import Signup from './pages/Signup';
 import FSBO from './pages/investor/FSBO';
 import FlipCalculator from './pages/investor/FlipCalculator';
+import AdminDashboard from './pages/admin/Dashboard';
+import AdminReferrers from './pages/admin/Referrers';
 
 // ============================================================
 // AUTH HELPER - Check if user is logged in
@@ -207,6 +210,22 @@ function App() {
           <Route path="tools" element={<ToolsSettings />} />
           <Route path="marketing" element={<Marketing />} />
           <Route path="profile" element={<Profile />} />
+        </Route>
+
+        {/* Admin Routes - PROTECTED */}
+        <Route path="/admin" element={
+          <PrivateRoute>
+            <AdminLayout />
+          </PrivateRoute>
+        }>
+          <Route index element={<Navigate to="/admin/dashboard" replace />} />
+          <Route path="dashboard" element={<AdminDashboard />} />
+          <Route path="referrers" element={<AdminReferrers />} />
+          <Route path="referrers/:id" element={<AdminReferrers />} />
+          <Route path="coupons" element={<div className="p-8 text-center text-gray-500">Coupons - Coming Soon</div>} />
+          <Route path="commissions" element={<div className="p-8 text-center text-gray-500">Commissions - Coming Soon</div>} />
+          <Route path="analytics" element={<div className="p-8 text-center text-gray-500">Analytics - Coming Soon</div>} />
+          <Route path="settings" element={<div className="p-8 text-center text-gray-500">Settings - Coming Soon</div>} />
         </Route>
 
         {/* Explicit Waitlist Route (Accessible from anywhere if needed, or just root) */}

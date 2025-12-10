@@ -134,10 +134,23 @@ try {
   const walletRoutes = require('./routes/wallet');
   console.log('  ✓ Wallet');
 
+  console.log('  Loading referral...');
+  const referralRoutes = require('./routes/referral');
+  console.log('  ✓ Referral');
+
+  console.log('  Loading admin-referrers...');
+  const adminReferrersRoutes = require('./routes/admin-referrers');
+  console.log('  ✓ Admin Referrers');
+
+  console.log('  Loading admin-coupons...');
+  const adminCouponsRoutes = require('./routes/admin-coupons');
+  console.log('  ✓ Admin Coupons');
+
   console.log('Mounting routes...');
   // Public Routes
   app.use('/api/voice-ai', checkDatabase, voiceAiRoutes); // Voice AI must be public for Twilio
   app.use('/api/waitlist', checkDatabase, waitlistRoutes);
+  app.use('/api/referral', checkDatabase, referralRoutes); // Referral validation is public
   app.use('/api/wallet', checkDatabase, authenticateToken, walletRoutes);
 
   // Protected Routes (Require Auth)
@@ -155,6 +168,8 @@ try {
   app.use('/api/email-campaigns', checkDatabase, authenticateToken, emailCampaignsRoutes);
   app.use('/api/admin-ai', checkDatabase, authenticateToken, adminAiRoutes);
   app.use('/api/token-pricing', checkDatabase, authenticateToken, tokenPricingRoutes); // [NEW]
+  app.use('/api/admin/referrers', checkDatabase, authenticateToken, adminReferrersRoutes); // [REFERRAL SYSTEM]
+  app.use('/api/admin/coupons', checkDatabase, authenticateToken, adminCouponsRoutes); // [COUPON SYSTEM]
   console.log('✓ Routes mounted');
 
   app.use((err, req, res, next) => {
