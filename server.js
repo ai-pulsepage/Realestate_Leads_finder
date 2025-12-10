@@ -126,14 +126,6 @@ try {
   const adminAiRoutes = require('./routes/admin-ai'); // [AI PERSONA GENERATOR]
   console.log('  ✓ Admin AI');
 
-  console.log('  Loading projects...');
-  const projectsRoutes = require('./routes/projects');
-  console.log('  ✓ Projects');
-
-  console.log('  Loading bids...');
-  const bidsRoutes = require('./routes/bids');
-  console.log('  ✓ Bids');
-
   console.log('  Loading waitlist...');
   const waitlistRoutes = require('./routes/waitlist');
   console.log('  ✓ Waitlist');
