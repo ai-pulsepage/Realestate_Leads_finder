@@ -61,12 +61,12 @@ try {
   app.use('/api/auth', checkDatabase, authRoutes);
   console.log('  ✓ Auth');
 
+  // Middleware - MUST be imported before use
+  const { authenticateToken } = require('./middleware/auth');
+
   const crmRoutes = require('./routes/crm');
   app.use('/api/crm', checkDatabase, authenticateToken, crmRoutes);
   console.log('  ✓ CRM');
-
-  // Middleware
-  const { authenticateToken } = require('./middleware/auth');
 
   // Token Pricing Routes (New)
   const tokenPricingRoutes = require('./routes/token-pricing');
