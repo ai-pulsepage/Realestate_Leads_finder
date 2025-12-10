@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { propertiesApi } from '../../api/properties';
+import apiClient from '../../api/client';
 
 const ProviderDashboard = () => {
+    const [user, setUser] = useState(null);
     const [stats, setStats] = useState({
         newLeads: 0,
         activeBids: 0,
@@ -10,20 +12,42 @@ const ProviderDashboard = () => {
         profileViews: 0
     });
     const [loading, setLoading] = useState(true);
+    const [recentActivity, setRecentActivity] = useState([]);
 
     useEffect(() => {
+        // Get user from localStorage
+        const userStr = localStorage.getItem('user');
+        if (userStr) {
+            try {
+                setUser(JSON.parse(userStr));
+            } catch (e) {
+                console.error('Error parsing user');
+            }
+        }
         loadStats();
     }, []);
 
     const loadStats = async () => {
         try {
-            // Mock stats for now, but fetch real leads count
-            const leads = await propertiesApi.getRecentSales(1); // Last 1 month
+            // Fetch real data from APIs
+            const [leadsRes, bidsRes, projectsRes] = await Promise.allSettled([
+                propertiesApi.getRecentSales(1),
+                apiClient.get('/bids/my-bids'),
+                apiClient.get('/projects')
+            ]);
+
+            const leads = leadsRes.status === 'fulfilled' ? leadsRes.value : [];
+            const bids = bidsRes.status === 'fulfilled' ? bidsRes.value.data?.bids || [] : [];
+            const projects = projectsRes.status === 'fulfilled' ? projectsRes.value.data?.projects || [] : [];
+
+            const activeBids = bids.filter(b => b.status === 'pending' || b.status === 'submitted').length;
+            const wonProjects = bids.filter(b => b.status === 'accepted').length;
+
             setStats({
                 newLeads: leads.length,
-                activeBids: 3, // Mock
-                wonProjects: 1, // Mock
-                profileViews: 12 // Mock
+                activeBids: activeBids,
+                wonProjects: wonProjects,
+                profileViews: Math.floor(Math.random() * 20) + 5 // Placeholder until analytics implemented
             });
         } catch (err) {
             console.error('Error loading dashboard stats:', err);
@@ -32,12 +56,14 @@ const ProviderDashboard = () => {
         }
     };
 
+    const userName = user?.full_name || user?.email?.split('@')[0] || 'Pro';
+
     return (
         <div className="min-h-screen bg-gray-50 p-8">
             <div className="max-w-7xl mx-auto">
                 <header className="mb-8">
                     <h1 className="text-3xl font-bold text-gray-900">Provider Dashboard</h1>
-                    <p className="text-gray-600">Welcome back, Pro. Here's what's happening today.</p>
+                    <p className="text-gray-600">Welcome back, {userName}. Here's what's happening today.</p>
                 </header>
 
                 {/* Stats Grid */}
