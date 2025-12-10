@@ -17,6 +17,7 @@ import LandingPageRevised from './pages/LandingPageRevised';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import FSBO from './pages/investor/FSBO';
+import FlipCalculator from './pages/investor/FlipCalculator';
 
 // Placeholder Pages
 const Home = () => (
@@ -111,7 +112,7 @@ function App() {
           <Route path="campaigns" element={<div>Campaigns</div>} />
           <Route path="marketing" element={<Marketing />} />
           <Route path="tools" element={<ToolsSettings />} />
-          <Route path="calculator" element={<div>Flipping Calculator</div>} />
+          <Route path="calculator" element={<FlipCalculator />} />
         </Route>
 
         {/* Provider Routes */}
