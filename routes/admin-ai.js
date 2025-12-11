@@ -187,8 +187,8 @@ router.put('/voice-settings/:user_id', async (req, res) => {
 // ============================================================
 router.get('/dual-agent-settings', async (req, res) => {
     try {
-        // Get user from auth middleware or query param
-        const userId = req.user?.user_id || req.query.user_id;
+        // Get user from auth middleware or query param (handle both userId and user_id from JWT)
+        const userId = req.user?.userId || req.user?.user_id || req.query.user_id;
 
         if (!userId) {
             return res.status(400).json({ success: false, message: 'User ID required' });
@@ -237,7 +237,7 @@ router.get('/dual-agent-settings', async (req, res) => {
 // ============================================================
 router.put('/dual-agent-settings', async (req, res) => {
     try {
-        const userId = req.user?.user_id || req.body.user_id;
+        const userId = req.user?.userId || req.user?.user_id || req.body.user_id;
         const { inbound_config, outbound_config, ai_enabled } = req.body;
 
         if (!userId) {
