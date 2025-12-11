@@ -56,7 +56,7 @@ const ToolsSettings = () => {
     useEffect(() => {
         const loadSettings = async () => {
             try {
-                const token = localStorage.getItem('token');
+                const token = localStorage.getItem('authToken');
                 const res = await fetch(`${API_BASE}/api/admin/dual-agent-settings`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
@@ -88,7 +88,7 @@ const ToolsSettings = () => {
         setError(null);
 
         try {
-            const token = localStorage.getItem('token');
+            const token = localStorage.getItem('authToken');
             const res = await fetch(`${API_BASE}/api/admin/dual-agent-settings`, {
                 method: 'PUT',
                 headers: {
@@ -771,8 +771,8 @@ const ToolsSettings = () => {
                                             key={num.phoneNumber}
                                             onClick={() => setSelectedNumber(num.phoneNumber)}
                                             className={`flex items-center justify-between p-4 border-2 rounded-xl cursor-pointer transition ${selectedNumber === num.phoneNumber
-                                                    ? 'border-violet-500 bg-violet-50'
-                                                    : 'border-gray-100 hover:border-violet-300 hover:bg-violet-50'
+                                                ? 'border-violet-500 bg-violet-50'
+                                                : 'border-gray-100 hover:border-violet-300 hover:bg-violet-50'
                                                 }`}
                                         >
                                             <div>
