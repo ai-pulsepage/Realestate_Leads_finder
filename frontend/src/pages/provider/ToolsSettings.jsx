@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
     Phone, PhoneOutgoing, PhoneIncoming, Calendar, Wallet,
     Mail, Settings, Save, Loader2, CheckCircle, AlertCircle,
-    Mic, Volume2, Clock, Users, MessageSquare, Zap
+    Mic, Volume2, Clock, Users, MessageSquare, Zap, Sparkles
 } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
@@ -41,7 +41,12 @@ const ToolsSettings = () => {
 
     // Modals
     const [showBuyModal, setShowBuyModal] = useState(false);
+    const [showGenerateModal, setShowGenerateModal] = useState(false);
     const [calendarConnected, setCalendarConnected] = useState(false);
+
+    // AI Generate State
+    const [generateData, setGenerateData] = useState({ companyName: '', description: '' });
+    const [generating, setGenerating] = useState(false);
 
     // Twilio Number Management
     const [areaCodeSearch, setAreaCodeSearch] = useState('');
@@ -232,6 +237,48 @@ const ToolsSettings = () => {
             setError('Failed to set number');
         } finally {
             setPurchasingNumber(false);
+        }
+    };
+
+    // Generate Knowledge Base with AI
+    const generateKnowledgeBase = async () => {
+        if (!generateData.companyName || !generateData.description) {
+            setError('Please enter your company name and description');
+            return;
+        }
+
+        setGenerating(true);
+        setError(null);
+
+        try {
+            const token = localStorage.getItem('authToken');
+            const res = await fetch(`${API_BASE}/admin/generate-persona`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    description: generateData.description,
+                    company_name: generateData.companyName
+                })
+            });
+
+            const data = await res.json();
+
+            if (data.success && data.generated_prompt) {
+                // Set the generated knowledge base
+                setInboundConfig(prev => ({ ...prev, knowledgeBase: data.generated_prompt }));
+                setShowGenerateModal(false);
+                setGenerateData({ companyName: '', description: '' });
+            } else {
+                setError(data.message || 'Failed to generate knowledge base');
+            }
+        } catch (err) {
+            console.error('Generate error:', err);
+            setError('Failed to generate knowledge base. Please try again.');
+        } finally {
+            setGenerating(false);
         }
     };
 
@@ -471,10 +518,19 @@ const ToolsSettings = () => {
 
                                 {/* Knowledge Base */}
                                 <div>
-                                    <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
-                                        <MessageSquare className="w-4 h-4 text-violet-500" />
-                                        Knowledge Base
-                                    </label>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                                            <MessageSquare className="w-4 h-4 text-violet-500" />
+                                            Knowledge Base
+                                        </label>
+                                        <button
+                                            onClick={() => setShowGenerateModal(true)}
+                                            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-violet-600 bg-violet-50 rounded-lg hover:bg-violet-100 transition"
+                                        >
+                                            <Sparkles className="w-4 h-4" />
+                                            Generate with AI
+                                        </button>
+                                    </div>
                                     <textarea
                                         rows={5}
                                         value={inboundConfig.knowledgeBase}
@@ -803,6 +859,89 @@ const ToolsSettings = () => {
                                 </div>
                             </>
                         )}
+                    </div>
+                </div>
+            )}
+
+            {/* Generate Knowledge Base Modal */}
+            {showGenerateModal && (
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6">
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="w-12 h-12 bg-violet-100 rounded-xl flex items-center justify-center">
+                                <Sparkles className="w-6 h-6 text-violet-600" />
+                            </div>
+                            <div>
+                                <h3 className="text-xl font-bold text-gray-900">Generate with AI</h3>
+                                <p className="text-sm text-gray-500">Let AI create your knowledge base</p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                                    Company Name
+                                </label>
+                                <input
+                                    type="text"
+                                    value={generateData.companyName}
+                                    onChange={(e) => setGenerateData({ ...generateData, companyName: e.target.value })}
+                                    className="w-full rounded-lg border-2 border-gray-200 px-4 py-3 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition"
+                                    placeholder="e.g., Smith's Roofing"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                                    Describe Your Business
+                                </label>
+                                <textarea
+                                    rows={4}
+                                    value={generateData.description}
+                                    onChange={(e) => setGenerateData({ ...generateData, description: e.target.value })}
+                                    className="w-full rounded-lg border-2 border-gray-200 px-4 py-3 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition resize-none"
+                                    placeholder="e.g., We're a roofing contractor in Miami specializing in residential repairs and new installations. We offer free estimates and 24/7 emergency service. Hourly rate starts at $75..."
+                                />
+                                <p className="mt-1 text-xs text-gray-500">
+                                    Include: services, pricing, hours, location, and any FAQs
+                                </p>
+                            </div>
+                        </div>
+
+                        {error && (
+                            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
+                                {error}
+                            </div>
+                        )}
+
+                        <div className="flex justify-end gap-3 mt-6">
+                            <button
+                                onClick={() => {
+                                    setShowGenerateModal(false);
+                                    setGenerateData({ companyName: '', description: '' });
+                                    setError(null);
+                                }}
+                                className="px-5 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-100 rounded-lg transition"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={generateKnowledgeBase}
+                                disabled={generating || !generateData.companyName || !generateData.description}
+                                className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-violet-600 hover:bg-violet-700 rounded-lg transition disabled:opacity-50"
+                            >
+                                {generating ? (
+                                    <>
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                        Generating...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Sparkles className="w-4 h-4" />
+                                        Generate
+                                    </>
+                                )}
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
