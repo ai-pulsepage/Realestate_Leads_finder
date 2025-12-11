@@ -8,22 +8,24 @@ services:
     restart: always
     ports:
       - "8080:8080"
+    volumes:
+      - ./real-estate-leads-478814-fa72b6068d3b.json:/app/real-estate-leads-478814-fa72b6068d3b.json:ro
     environment:
       - PORT=8080
       - DATABASE_URL=postgresql://postgres:password@db:5432/real_estate_leads
       - TWENTY_API_URL=http://twenty-server:3000
-      - TWENTY_API_KEY=${TWENTY_API_KEY} # User must set this in .env
+      - TWENTY_API_KEY=${TWENTY_API_KEY}
       - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID}
       - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN}
       - TWILIO_PHONE_NUMBER=${TWILIO_PHONE_NUMBER}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/real-estate-leads-478814-fa72b6068d3b.json
     depends_on:
       - db
       - twenty-server
     networks:
       - app-network
-
   # ------------------------------------------------------------------
   # 2. SHARED DATABASE (Postgres)
   # ------------------------------------------------------------------
@@ -34,10 +36,10 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
-      POSTGRES_DB: real_estate_leads # Default DB
+      POSTGRES_DB: real_estate_leads
     volumes:
       - db-data:/var/lib/postgresql/data
-      - ./migrations:/docker-entrypoint-initdb.d # Auto-run migrations
+      - ./migrations:/docker-entrypoint-initdb.d
     ports:
       - "5432:5432"
     networks:
@@ -54,7 +56,7 @@ services:
     environment:
       - PORT=3000
       - NODE_PORT=3000
-      - PG_DATABASE_URL=postgresql://postgres:password@db:5432/postgres # Twenty uses 'postgres' DB by default or creates its own
+      - PG_DATABASE_URL=postgresql://postgres:password@db:5432/postgres
       - REDIS_URL=redis://redis:6379
       - SERVER_URL=https://crm.bizleadfinders.com
       - FRONT_BASE_URL=https://crm.bizleadfinders.com
@@ -70,7 +72,6 @@ services:
       - redis
     networks:
       - app-network
-
   # ------------------------------------------------------------------
   # 4. TWENTY CRM (Worker)
   # ------------------------------------------------------------------
@@ -89,7 +90,6 @@ services:
       - redis
     networks:
       - app-network
-
   # ------------------------------------------------------------------
   # 5. REDIS (For Twenty Queues)
   # ------------------------------------------------------------------
@@ -99,7 +99,6 @@ services:
     restart: always
     networks:
       - app-network
-
   # ------------------------------------------------------------------
   # 6. CADDY (Reverse Proxy)
   # ------------------------------------------------------------------
@@ -118,11 +117,9 @@ services:
       - twenty-server
     networks:
       - app-network
-
 networks:
   app-network:
     driver: bridge
-
 volumes:
   db-data:
   caddy_data:
