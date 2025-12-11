@@ -27,13 +27,20 @@ CREATE INDEX IF NOT EXISTS idx_call_logs_created ON call_logs(created_at DESC);
 CREATE TABLE IF NOT EXISTS voice_settings (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID UNIQUE REFERENCES users(user_id) ON DELETE CASCADE,
+    -- Inbound call settings (used by /dual-agent-settings)
+    inbound_config JSONB DEFAULT '{}',
+    -- Outbound call settings
+    outbound_config JSONB DEFAULT '{}',
+    -- Legacy fields (kept for backward compat)
     greeting_en TEXT DEFAULT 'Hello! How can I help you today?',
     greeting_es TEXT DEFAULT '¡Hola! ¿Cómo puedo ayudarle hoy?',
     system_prompt TEXT,
     receptionist_config JSONB DEFAULT '{}',
-    outbound_config JSONB DEFAULT '{}',
+    -- Calendar integration
+    calendar_connected BOOLEAN DEFAULT false,
     calendar_token_encrypted TEXT,
     calendar_provider VARCHAR(20), -- 'google', 'outlook', etc.
+    -- Voice settings
     voice_id VARCHAR(50) DEFAULT 'Polly.Joanna',
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -43,3 +50,4 @@ CREATE INDEX IF NOT EXISTS idx_voice_settings_user_id ON voice_settings(user_id)
 
 -- 3. Add token_balance column to users if missing
 ALTER TABLE users ADD COLUMN IF NOT EXISTS token_balance INTEGER DEFAULT 1000;
+

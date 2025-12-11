@@ -147,9 +147,11 @@ router.post('/language-selected', async (req, res) => {
     const language = Digits === '1' ? 'en' : Digits === '2' ? 'es' : 'en';
     const subscriberNumber = To;
 
-    // Look up subscriber and settings
+    // Look up subscriber and settings (including inbound_config from frontend)
     const subscriberQuery = await req.pool.query(`
-      SELECT u.user_id, vs.greeting_en, vs.greeting_es, vs.system_prompt
+      SELECT u.user_id, 
+             vs.greeting_en, vs.greeting_es, vs.system_prompt,
+             vs.inbound_config, vs.outbound_config, vs.receptionist_config
       FROM users u
       LEFT JOIN voice_settings vs ON u.user_id = vs.user_id
       WHERE u.twilio_phone_number = $1
@@ -162,7 +164,7 @@ router.post('/language-selected', async (req, res) => {
       return res.send(twiml.toString());
     }
 
-    const { user_id, greeting_en, greeting_es, system_prompt } = subscriberQuery.rows[0];
+    const { user_id, greeting_en, greeting_es, system_prompt, inbound_config, outbound_config } = subscriberQuery.rows[0];
 
     // Update call log
     await req.pool.query(`
@@ -171,13 +173,26 @@ router.post('/language-selected', async (req, res) => {
        WHERE twilio_call_sid = $2
     `, [language, CallSid]);
 
-    // Determine greeting
-    let greeting = language === 'en' ? greeting_en : greeting_es;
-    if (!greeting) {
-      greeting = language === 'en'
-        ? 'Welcome. How can I help you today?'
-        : 'Bienvenido. ¿Cómo puedo ayudarle hoy?';
+    // Determine greeting - PRIORITY:
+    // 1. Frontend-saved inbound_config.greeting (or greeting_es)
+    // 2. Legacy greeting_en/greeting_es columns
+    // 3. Default fallback
+    const parsedInbound = typeof inbound_config === 'string' ? JSON.parse(inbound_config) : (inbound_config || {});
+
+    let greeting;
+    if (language === 'en') {
+      greeting = parsedInbound.greeting || greeting_en || 'Welcome. How can I help you today?';
+    } else {
+      greeting = parsedInbound.greeting_es || greeting_es || 'Bienvenido. ¿Cómo puedo ayudarle hoy?';
     }
+
+    // Get knowledge base for AI context
+    const knowledgeBase = parsedInbound.knowledgeBase || '';
+
+    // Build system prompt with knowledge base
+    const enhancedSystemPrompt = system_prompt
+      ? `${system_prompt}\n\nKnowledge Base:\n${knowledgeBase}`
+      : knowledgeBase;
 
     // Connect to WebSocket
     const twiml = new twilio.twiml.VoiceResponse();
@@ -193,14 +208,13 @@ router.post('/language-selected', async (req, res) => {
     stream.parameter({ name: 'userId', value: user_id });
     stream.parameter({ name: 'language', value: language });
     stream.parameter({ name: 'callSid', value: CallSid });
-    stream.parameter({ name: 'systemPrompt', value: system_prompt || '' }); // Pass prompt to stream
-    stream.parameter({ name: 'initialGreeting', value: greeting }); // Pass greeting to stream
+    stream.parameter({ name: 'systemPrompt', value: enhancedSystemPrompt }); // Enhanced with knowledge base
+    stream.parameter({ name: 'initialGreeting', value: greeting }); // Dynamic greeting from settings
 
-    // Pass receptionist config (serialize to JSON)
-    const receptionistConfig = subscriberQuery.rows[0].receptionist_config || {};
-    stream.parameter({ name: 'receptionistConfig', value: JSON.stringify(receptionistConfig) });
+    // Pass full inbound config so WebSocket can use afterHours, forwardingNumber, etc.
+    stream.parameter({ name: 'inboundConfig', value: JSON.stringify(parsedInbound) });
 
-    console.log(`✅ Connected to WebSocket for user ${user_id}`);
+    console.log(`✅ Connected to WebSocket for user ${user_id}, greeting: "${greeting.substring(0, 50)}..."`);
     res.type('text/xml');
     res.send(twiml.toString());
 
@@ -567,28 +581,41 @@ router.post('/outbound-connected', async (req, res) => {
 
     console.log(`📞 Outbound call connected. User: ${userId}, AnsweredBy: ${answeredBy}`);
 
+    // Get outbound settings from database
+    const subscriberQuery = await req.pool.query(`
+      SELECT vs.system_prompt, vs.outbound_config, vs.inbound_config
+      FROM voice_settings vs
+      WHERE vs.user_id = $1
+    `, [userId]);
+
+    const settings = subscriberQuery.rows[0] || {};
+    const outboundConfig = typeof settings.outbound_config === 'string'
+      ? JSON.parse(settings.outbound_config)
+      : (settings.outbound_config || {});
+
     const twiml = new twilio.twiml.VoiceResponse();
 
     if (answeredBy === 'machine_start') {
-      // Leave Voicemail
-      twiml.say('Hello, I am calling regarding your property inquiry. Please call us back.');
+      // Leave Voicemail - use saved voicemail message from frontend
+      const voicemailMessage = outboundConfig.voicemailDrop
+        || "Hello, I am calling regarding your property inquiry. Please call us back.";
+
+      console.log(`📼 Leaving voicemail: "${voicemailMessage.substring(0, 50)}..."`);
+      twiml.say({ voice: 'Polly.Joanna', language: 'en-US' }, voicemailMessage);
       twiml.hangup();
     } else {
       // Connect to AI
       const host = req.get('host');
       const protocol = host.includes('localhost') ? 'ws' : 'wss';
 
-      // Get Settings
-      const subscriberQuery = await req.pool.query(`
-        SELECT vs.system_prompt, vs.greeting_en, vs.receptionist_config
-        FROM voice_settings vs
-        WHERE vs.user_id = $1
-      `, [userId]);
+      const systemPrompt = settings.system_prompt || "You are a helpful sales assistant.";
 
-      const settings = subscriberQuery.rows[0] || {};
-      const systemPrompt = settings.system_prompt || "You are a helpful assistant.";
-      // Use a specific outbound greeting if available, otherwise generic
-      const greeting = "Hello! I'm calling from Biz Lead Finders. Am I speaking with the property owner?";
+      // Use opening script from frontend settings
+      const agentName = outboundConfig.agentName || 'Sarah';
+      const openingScript = outboundConfig.openingScript
+        || `Hi, this is ${agentName} from Biz Lead Finders. Am I speaking with the property owner?`;
+
+      console.log(`📞 Outbound AI connecting, agent: ${agentName}`);
 
       const connect = twiml.connect();
       const stream = connect.stream({
@@ -598,8 +625,8 @@ router.post('/outbound-connected', async (req, res) => {
       stream.parameter({ name: 'userId', value: userId });
       stream.parameter({ name: 'callSid', value: callSid });
       stream.parameter({ name: 'systemPrompt', value: systemPrompt });
-      stream.parameter({ name: 'initialGreeting', value: greeting });
-      stream.parameter({ name: 'receptionistConfig', value: JSON.stringify(settings.receptionist_config || {}) });
+      stream.parameter({ name: 'initialGreeting', value: openingScript });
+      stream.parameter({ name: 'outboundConfig', value: JSON.stringify(outboundConfig) });
       stream.parameter({ name: 'isOutbound', value: 'true' }); // Flag for AI to know context
     }
 
