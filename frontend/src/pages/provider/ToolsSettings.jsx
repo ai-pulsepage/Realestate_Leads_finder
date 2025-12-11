@@ -62,7 +62,7 @@ const ToolsSettings = () => {
         const loadSettings = async () => {
             try {
                 const token = localStorage.getItem('authToken');
-                const res = await fetch(`${API_BASE}/admin/dual-agent-settings`, {
+                const res = await fetch(`${API_BASE}/admin-ai/dual-agent-settings`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 const data = await res.json();
@@ -94,7 +94,7 @@ const ToolsSettings = () => {
 
         try {
             const token = localStorage.getItem('authToken');
-            const res = await fetch(`${API_BASE}/admin/dual-agent-settings`, {
+            const res = await fetch(`${API_BASE}/admin-ai/dual-agent-settings`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
