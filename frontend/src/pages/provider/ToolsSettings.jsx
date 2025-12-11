@@ -57,7 +57,7 @@ const ToolsSettings = () => {
         const loadSettings = async () => {
             try {
                 const token = localStorage.getItem('authToken');
-                const res = await fetch(`${API_BASE}/api/admin/dual-agent-settings`, {
+                const res = await fetch(`${API_BASE}/admin/dual-agent-settings`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 const data = await res.json();
@@ -89,7 +89,7 @@ const ToolsSettings = () => {
 
         try {
             const token = localStorage.getItem('authToken');
-            const res = await fetch(`${API_BASE}/api/admin/dual-agent-settings`, {
+            const res = await fetch(`${API_BASE}/admin/dual-agent-settings`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -131,7 +131,7 @@ const ToolsSettings = () => {
 
         try {
             const token = localStorage.getItem('authToken');
-            const res = await fetch(`${API_BASE}/api/twilio/available-numbers?areaCode=${areaCodeSearch}`, {
+            const res = await fetch(`${API_BASE}/twilio/available-numbers?areaCode=${areaCodeSearch}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             const data = await res.json();
@@ -163,7 +163,7 @@ const ToolsSettings = () => {
             const token = localStorage.getItem('authToken');
             const user = JSON.parse(localStorage.getItem('user') || '{}');
 
-            const res = await fetch(`${API_BASE}/api/twilio/purchase-number`, {
+            const res = await fetch(`${API_BASE}/twilio/purchase-number`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -204,7 +204,7 @@ const ToolsSettings = () => {
             const token = localStorage.getItem('authToken');
             const user = JSON.parse(localStorage.getItem('user') || '{}');
 
-            const res = await fetch(`${API_BASE}/api/twilio/set-number-manual`, {
+            const res = await fetch(`${API_BASE}/twilio/set-number-manual`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

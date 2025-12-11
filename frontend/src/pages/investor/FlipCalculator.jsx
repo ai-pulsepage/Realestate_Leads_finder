@@ -103,7 +103,7 @@ const FlipCalculator = () => {
         if (!searchQuery.trim()) return;
         setSearching(true);
         try {
-            const res = await fetch(`${API_BASE}/api/properties?search=${encodeURIComponent(searchQuery)}&limit=10`);
+            const res = await fetch(`${API_BASE}/properties?search=${encodeURIComponent(searchQuery)}&limit=10`);
             const data = await res.json();
             setSearchResults(data.properties || []);
             setShowSearch(true);
