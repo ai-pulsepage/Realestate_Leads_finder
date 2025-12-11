@@ -79,8 +79,12 @@ router.post('/login', async (req, res) => {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
 
-        // Generate Token
-        const token = jwt.sign({ userId: user.user_id, email: user.email }, JWT_SECRET, { expiresIn: '24h' });
+        // Generate Token (include role for admin access)
+        const token = jwt.sign({
+            userId: user.user_id,
+            email: user.email,
+            role: user.role || user.subscription_tier
+        }, JWT_SECRET, { expiresIn: '24h' });
 
         // Update Last Login
         await req.pool.query('UPDATE users SET last_login = NOW() WHERE user_id = $1', [user.user_id]);
@@ -90,6 +94,8 @@ router.post('/login', async (req, res) => {
             user: {
                 user_id: user.user_id,
                 email: user.email,
+                full_name: user.full_name,
+                role: user.role || user.subscription_tier,
                 subscription_tier: user.subscription_tier
             },
             token: token
