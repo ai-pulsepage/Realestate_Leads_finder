@@ -18,6 +18,24 @@ class VoiceService {
   }
 
   /**
+   * Log an incoming call (wrapper for logCall)
+   * @param {string} user_id 
+   * @param {string} call_sid 
+   * @param {string} from_number 
+   * @param {string} to_number 
+   */
+  async logIncomingCall(user_id, call_sid, from_number, to_number) {
+    return this.logCall({
+      user_id,
+      call_sid,
+      direction: 'inbound',
+      from_number,
+      to_number,
+      status: 'in-progress'
+    });
+  }
+
+  /**
    * Log a call (Inbound or Outbound)
    * @param {object} callData 
    */
