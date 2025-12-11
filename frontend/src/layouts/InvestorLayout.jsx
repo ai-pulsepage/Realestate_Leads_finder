@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { LogOut, Home, Search, Building2, Megaphone, Mail, Settings, Calculator, Menu, X, Bell } from 'lucide-react';
+import RoleSwitcher from '../components/RoleSwitcher';
 
 export default function InvestorLayout() {
     const navigate = useNavigate();
@@ -51,8 +52,8 @@ export default function InvestorLayout() {
                             key={path}
                             to={path}
                             className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors ${isActive(path)
-                                    ? 'bg-blue-600/30 text-white font-medium border-l-4 border-blue-500'
-                                    : 'text-slate-300 hover:bg-white/10 hover:text-white'
+                                ? 'bg-blue-600/30 text-white font-medium border-l-4 border-blue-500'
+                                : 'text-slate-300 hover:bg-white/10 hover:text-white'
                                 }`}
                         >
                             <Icon className="w-5 h-5" />
@@ -130,6 +131,7 @@ export default function InvestorLayout() {
                         {navItems.find(item => isActive(item.path))?.label || 'Dashboard'}
                     </h1>
                     <div className="flex items-center space-x-4">
+                        <RoleSwitcher />
                         <button className="p-2 text-gray-400 hover:text-gray-600 relative">
                             <Bell className="w-5 h-5" />
                             <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>

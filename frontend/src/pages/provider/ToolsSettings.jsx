@@ -43,6 +43,15 @@ const ToolsSettings = () => {
     const [showBuyModal, setShowBuyModal] = useState(false);
     const [calendarConnected, setCalendarConnected] = useState(false);
 
+    // Twilio Number Management
+    const [areaCodeSearch, setAreaCodeSearch] = useState('');
+    const [availableNumbers, setAvailableNumbers] = useState([]);
+    const [searchingNumbers, setSearchingNumbers] = useState(false);
+    const [selectedNumber, setSelectedNumber] = useState(null);
+    const [purchasingNumber, setPurchasingNumber] = useState(false);
+    const [manualMode, setManualMode] = useState(false);
+    const [manualNumber, setManualNumber] = useState('');
+
     // Load settings on mount
     useEffect(() => {
         const loadSettings = async () => {
@@ -106,6 +115,123 @@ const ToolsSettings = () => {
             setError(err.message);
         } finally {
             setSaving(false);
+        }
+    };
+
+    // Search for available Twilio numbers
+    const searchNumbers = async () => {
+        if (!areaCodeSearch || areaCodeSearch.length < 3) {
+            setError('Please enter a 3-digit area code');
+            return;
+        }
+
+        setSearchingNumbers(true);
+        setError(null);
+        setAvailableNumbers([]);
+
+        try {
+            const token = localStorage.getItem('authToken');
+            const res = await fetch(`${API_BASE}/api/twilio/available-numbers?areaCode=${areaCodeSearch}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                setAvailableNumbers(data.numbers || []);
+                if (data.numbers?.length === 0) {
+                    setError('No numbers available in this area code. Try another.');
+                }
+            } else {
+                setError(data.message || 'Failed to search numbers');
+            }
+        } catch (err) {
+            console.error('Search error:', err);
+            setError('Failed to search numbers. Check your connection.');
+        } finally {
+            setSearchingNumbers(false);
+        }
+    };
+
+    // Purchase selected number
+    const purchaseNumber = async () => {
+        if (!selectedNumber) return;
+
+        setPurchasingNumber(true);
+        setError(null);
+
+        try {
+            const token = localStorage.getItem('authToken');
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+
+            const res = await fetch(`${API_BASE}/api/twilio/purchase-number`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    phoneNumber: selectedNumber,
+                    userId: user.user_id
+                })
+            });
+
+            const data = await res.json();
+
+            if (data.success) {
+                setInboundConfig(prev => ({ ...prev, twilioNumber: data.number.phoneNumber }));
+                setShowBuyModal(false);
+                setSelectedNumber(null);
+                setAvailableNumbers([]);
+            } else {
+                setError(data.message || 'Failed to purchase number');
+            }
+        } catch (err) {
+            console.error('Purchase error:', err);
+            setError('Failed to purchase number');
+        } finally {
+            setPurchasingNumber(false);
+        }
+    };
+
+    // Set number manually (for admin/testing)
+    const setNumberManually = async () => {
+        if (!manualNumber) return;
+
+        setPurchasingNumber(true);
+        setError(null);
+
+        try {
+            const token = localStorage.getItem('authToken');
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+
+            const res = await fetch(`${API_BASE}/api/twilio/set-number-manual`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    phoneNumber: manualNumber,
+                    userId: user.user_id,
+                    configureWebhooks: true
+                })
+            });
+
+            const data = await res.json();
+
+            if (data.success) {
+                setInboundConfig(prev => ({ ...prev, twilioNumber: data.phoneNumber }));
+                setShowBuyModal(false);
+                setManualNumber('');
+                setManualMode(false);
+            } else {
+                setError(data.message || 'Failed to set number');
+            }
+        } catch (err) {
+            console.error('Manual set error:', err);
+            setError('Failed to set number');
+        } finally {
+            setPurchasingNumber(false);
         }
     };
 
@@ -551,50 +677,132 @@ const ToolsSettings = () => {
             {showBuyModal && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
                     <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
-                        <div className="flex items-center gap-3 mb-4">
-                            <div className="p-2 bg-violet-100 rounded-lg">
-                                <Phone className="w-5 h-5 text-violet-600" />
-                            </div>
-                            <h3 className="text-lg font-bold text-gray-900">Get a New Number</h3>
-                        </div>
-                        <p className="text-sm text-gray-500 mb-4">
-                            Search for a local number to use with your AI receptionist.
-                        </p>
-
-                        <div className="flex gap-2 mb-4">
-                            <input
-                                type="text"
-                                placeholder="Area Code (e.g. 305)"
-                                className="flex-1 rounded-lg border-2 border-gray-200 p-3 text-sm focus:border-violet-500 transition"
-                            />
-                            <button className="bg-violet-600 hover:bg-violet-700 text-white px-5 py-3 rounded-lg text-sm font-semibold transition">
-                                Search
-                            </button>
-                        </div>
-
-                        <div className="space-y-2 mb-6 max-h-48 overflow-y-auto">
-                            {['(305) 555-0123', '(305) 555-0124', '(305) 555-0125'].map(num => (
-                                <div key={num} className="flex items-center justify-between p-4 border-2 border-gray-100 rounded-xl hover:border-violet-300 hover:bg-violet-50 cursor-pointer transition">
-                                    <span className="font-semibold text-gray-900 font-mono">{num}</span>
-                                    <span className="text-sm text-gray-500">$1.00/mo</span>
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-violet-100 rounded-lg">
+                                    <Phone className="w-5 h-5 text-violet-600" />
                                 </div>
-                            ))}
+                                <h3 className="text-lg font-bold text-gray-900">
+                                    {manualMode ? 'Enter Your Number' : 'Get a New Number'}
+                                </h3>
+                            </div>
+                            <button
+                                onClick={() => setManualMode(!manualMode)}
+                                className="text-xs text-violet-600 hover:underline"
+                            >
+                                {manualMode ? 'Search Numbers' : 'Enter Manually'}
+                            </button>
                         </div>
 
-                        <div className="flex justify-end gap-3">
-                            <button
-                                onClick={() => setShowBuyModal(false)}
-                                className="px-5 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={() => setShowBuyModal(false)}
-                                className="px-5 py-2.5 text-sm font-semibold text-white bg-green-600 hover:bg-green-700 rounded-lg transition"
-                            >
-                                Buy Selected
-                            </button>
-                        </div>
+                        {error && (
+                            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+                                {error}
+                            </div>
+                        )}
+
+                        {manualMode ? (
+                            /* Manual Entry Mode */
+                            <div className="space-y-4">
+                                <p className="text-sm text-gray-500">
+                                    Enter your existing Twilio number. Make sure webhooks are configured.
+                                </p>
+                                <input
+                                    type="text"
+                                    value={manualNumber}
+                                    onChange={(e) => setManualNumber(e.target.value)}
+                                    placeholder="(786) 544-6480 or +17865446480"
+                                    className="w-full rounded-lg border-2 border-gray-200 p-3 text-sm focus:border-violet-500 transition font-mono"
+                                />
+                                <div className="flex justify-end gap-3">
+                                    <button
+                                        onClick={() => { setShowBuyModal(false); setManualMode(false); setError(null); }}
+                                        className="px-5 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={setNumberManually}
+                                        disabled={purchasingNumber || !manualNumber}
+                                        className="px-5 py-2.5 text-sm font-semibold text-white bg-violet-600 hover:bg-violet-700 rounded-lg transition disabled:opacity-50"
+                                    >
+                                        {purchasingNumber ? 'Saving...' : 'Save Number'}
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            /* Search & Purchase Mode */
+                            <>
+                                <p className="text-sm text-gray-500 mb-4">
+                                    Search for a local number to use with your AI receptionist.
+                                </p>
+
+                                <div className="flex gap-2 mb-4">
+                                    <input
+                                        type="text"
+                                        value={areaCodeSearch}
+                                        onChange={(e) => setAreaCodeSearch(e.target.value.replace(/\D/g, '').slice(0, 3))}
+                                        placeholder="Area Code (e.g. 305)"
+                                        className="flex-1 rounded-lg border-2 border-gray-200 p-3 text-sm focus:border-violet-500 transition"
+                                        maxLength={3}
+                                    />
+                                    <button
+                                        onClick={searchNumbers}
+                                        disabled={searchingNumbers}
+                                        className="bg-violet-600 hover:bg-violet-700 text-white px-5 py-3 rounded-lg text-sm font-semibold transition disabled:opacity-50"
+                                    >
+                                        {searchingNumbers ? 'Searching...' : 'Search'}
+                                    </button>
+                                </div>
+
+                                <div className="space-y-2 mb-6 max-h-48 overflow-y-auto">
+                                    {availableNumbers.length === 0 && !searchingNumbers && (
+                                        <div className="text-center text-gray-400 py-8">
+                                            Enter an area code and click Search
+                                        </div>
+                                    )}
+                                    {searchingNumbers && (
+                                        <div className="text-center text-gray-500 py-8">
+                                            <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
+                                            Searching available numbers...
+                                        </div>
+                                    )}
+                                    {availableNumbers.map(num => (
+                                        <div
+                                            key={num.phoneNumber}
+                                            onClick={() => setSelectedNumber(num.phoneNumber)}
+                                            className={`flex items-center justify-between p-4 border-2 rounded-xl cursor-pointer transition ${selectedNumber === num.phoneNumber
+                                                    ? 'border-violet-500 bg-violet-50'
+                                                    : 'border-gray-100 hover:border-violet-300 hover:bg-violet-50'
+                                                }`}
+                                        >
+                                            <div>
+                                                <span className="font-semibold text-gray-900 font-mono">{num.friendlyName}</span>
+                                                {num.locality && (
+                                                    <span className="ml-2 text-xs text-gray-400">{num.locality}, {num.region}</span>
+                                                )}
+                                            </div>
+                                            <span className="text-sm text-gray-500">${num.monthlyPrice}/mo</span>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <div className="flex justify-end gap-3">
+                                    <button
+                                        onClick={() => { setShowBuyModal(false); setAvailableNumbers([]); setSelectedNumber(null); setError(null); }}
+                                        className="px-5 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={purchaseNumber}
+                                        disabled={purchasingNumber || !selectedNumber}
+                                        className="px-5 py-2.5 text-sm font-semibold text-white bg-green-600 hover:bg-green-700 rounded-lg transition disabled:opacity-50"
+                                    >
+                                        {purchasingNumber ? 'Purchasing...' : 'Buy Selected'}
+                                    </button>
+                                </div>
+                            </>
+                        )}
                     </div>
                 </div>
             )}

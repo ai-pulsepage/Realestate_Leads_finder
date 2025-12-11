@@ -96,13 +96,55 @@ router.post('/login', async (req, res) => {
                 email: user.email,
                 full_name: user.full_name,
                 role: user.role || user.subscription_tier,
-                subscription_tier: user.subscription_tier
+                subscription_tier: user.subscription_tier,
+                accessible_tiers: user.accessible_tiers || [user.subscription_tier],
+                active_tier: user.active_tier || user.subscription_tier
             },
             token: token
         });
 
     } catch (err) {
         console.error('Login Error:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// POST /api/auth/switch-tier - Switch active tier for multi-role users
+router.post('/switch-tier', async (req, res) => {
+    try {
+        const { user_id, new_tier } = req.body;
+
+        if (!user_id || !new_tier) {
+            return res.status(400).json({ error: 'user_id and new_tier are required' });
+        }
+
+        // Verify user exists and has access to the requested tier
+        const result = await req.pool.query(
+            'SELECT accessible_tiers, role FROM users WHERE user_id = $1',
+            [user_id]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        const user = result.rows[0];
+        const accessibleTiers = user.accessible_tiers || [];
+
+        // Admin can access anything
+        if (user.role !== 'admin' && !accessibleTiers.includes(new_tier)) {
+            return res.status(403).json({ error: 'You do not have access to this tier' });
+        }
+
+        // Update active tier
+        await req.pool.query(
+            'UPDATE users SET active_tier = $1 WHERE user_id = $2',
+            [new_tier, user_id]
+        );
+
+        res.json({ message: 'Tier switched successfully', active_tier: new_tier });
+    } catch (err) {
+        console.error('Switch Tier Error:', err);
         res.status(500).json({ error: 'Internal server error' });
     }
 });

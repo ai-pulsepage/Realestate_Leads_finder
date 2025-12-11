@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { LogOut, Home, Users, Briefcase, FileText, Settings, Mail, User, Menu, X } from 'lucide-react';
+import RoleSwitcher from '../components/RoleSwitcher';
 
 export default function ProviderLayout() {
     const navigate = useNavigate();
@@ -51,8 +52,8 @@ export default function ProviderLayout() {
                             key={path}
                             to={path}
                             className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors ${isActive(path)
-                                    ? 'bg-white/20 text-white font-medium'
-                                    : 'text-indigo-200 hover:bg-white/10 hover:text-white'
+                                ? 'bg-white/20 text-white font-medium'
+                                : 'text-indigo-200 hover:bg-white/10 hover:text-white'
                                 }`}
                         >
                             <Icon className="w-5 h-5" />
@@ -130,6 +131,7 @@ export default function ProviderLayout() {
                         {navItems.find(item => isActive(item.path))?.label || 'Dashboard'}
                     </h1>
                     <div className="flex items-center space-x-4">
+                        <RoleSwitcher />
                         <span className="bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded-full">
                             ● Active
                         </span>

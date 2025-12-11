@@ -146,12 +146,17 @@ try {
   const adminCouponsRoutes = require('./routes/admin-coupons');
   console.log('  ✓ Admin Coupons');
 
+  console.log('  Loading twilio...');
+  const twilioRoutes = require('./routes/twilio');
+  console.log('  ✓ Twilio');
+
   console.log('Mounting routes...');
   // Public Routes
   app.use('/api/voice-ai', checkDatabase, voiceAiRoutes); // Voice AI must be public for Twilio
   app.use('/api/waitlist', checkDatabase, waitlistRoutes);
   app.use('/api/referral', checkDatabase, referralRoutes); // Referral validation is public
   app.use('/api/wallet', checkDatabase, authenticateToken, walletRoutes);
+  app.use('/api/twilio', checkDatabase, authenticateToken, twilioRoutes); // Twilio number management
 
   // Protected Routes (Require Auth)
   app.use('/api/properties', checkDatabase, authenticateToken, propertiesRoutes);
