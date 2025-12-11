@@ -13,3 +13,5 @@ MiamidadeFTP/
 *.xlsx
 *.zip
 *.pdf
+# Google service account key
+real-estate-leads-478814-fa72b6068d3b.json
