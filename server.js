@@ -304,20 +304,27 @@ try {
         .on('data', async (data) => {
           if (data.results[0] && data.results[0].alternatives[0]) {
             const transcript = data.results[0].alternatives[0].transcript;
+            const isFinal = data.results[0].isFinal;
 
-            console.log(`🗣️ User: ${transcript}`);
+            console.log(`🗣️ User: ${transcript}${isFinal ? ' [FINAL]' : ''}`);
 
-            // Debounce
-            transcriptBuffer += ' ' + transcript;
+            // Only process final results to avoid duplicate/partial responses
+            if (isFinal) {
+              // Clear any pending timer
+              if (silenceTimer) clearTimeout(silenceTimer);
 
-            if (silenceTimer) clearTimeout(silenceTimer);
-            silenceTimer = setTimeout(() => {
-              const finalMessage = transcriptBuffer.trim();
-              transcriptBuffer = '';
-              if (finalMessage) {
-                processUserMessage(finalMessage);
-              }
-            }, 800);
+              // Add to buffer (in case user speaks multiple sentences)
+              transcriptBuffer += ' ' + transcript;
+
+              // Wait for a pause before processing (user might continue speaking)
+              silenceTimer = setTimeout(() => {
+                const finalMessage = transcriptBuffer.trim();
+                transcriptBuffer = '';
+                if (finalMessage) {
+                  processUserMessage(finalMessage);
+                }
+              }, 1200); // 1.2 second pause before AI responds
+            }
           }
         });
     }
