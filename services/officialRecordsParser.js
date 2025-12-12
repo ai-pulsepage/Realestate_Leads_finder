@@ -22,6 +22,7 @@ const DEED_DOCUMENT_TYPES = [
     'GD',     // Gift Deed
     'LD',     // Life Estate Deed
     'DEED',   // Generic Deed
+    'DEE',    // Deed (Miami-Dade abbreviation)
 ];
 
 // Distress indicator document types
@@ -36,20 +37,20 @@ const DISTRESS_DOCUMENT_TYPES = [
 
 /**
  * Field positions in the caret-delimited record
- * Based on Miami-Dade Official Records structure
+ * Based on Miami-Dade Official Records structure (verified from actual files)
  */
 const FIELD_POSITIONS = {
     CFN_YEAR: 0,
     CFN_SEQ: 1,
     GROUP_ID: 2,
-    RECORDING_DATE: 3,
+    RECORDING_DATE: 3,      // MMDDYYYY format
     RECORDING_TIME: 4,
     RECORDING_BOOK: 5,
     RECORDING_PAGE: 6,
     BOOK_TYPE: 7,
     DOCUMENT_PAGES: 8,
     APPEND_PAGES: 9,
-    DOCUMENT_TYPE: 10,
+    DOCUMENT_TYPE: 10,      // DEE, WD, QCD, etc.
     DOCUMENT_TYPE_DESC: 11,
     DOCUMENT_DATE: 12,
     FIRST_PARTY: 13,
@@ -61,37 +62,33 @@ const FIELD_POSITIONS = {
     ORIGINAL_RECORDING_PAGE: 19,
     ORIGINAL_MISC_REF: 20,
     SUBDIVISION_NAME: 21,
-    FOLIO_NUMBER: 22,
-    LEGAL_DESCRIPTION: 23,
-    SECTION: 24,
-    TOWNSHIP: 25,
-    RANGE: 26,
-    PLAT_BOOK: 27,
-    PLAT_PAGE: 28,
-    BLOCK: 29,
+    // Fields 22-37 contain legal description, section, township, etc.
+    LEGAL_DESCRIPTION: 25,
     CASE_NUMBER: 30,
-    CONSIDERATION_1: 31,
+    CONSIDERATION_1: 31,    // Sale price
     CONSIDERATION_2: 32,
     DEED_DOC_TAX: 33,
     SINGLE_FAMILY: 34,
     SURTAX: 35,
     INTANGIBLE: 36,
     DOC_STAMPS: 37,
-    KEY: 38,
+    FOLIO_NUMBER: 38,       // Parcel ID - confirmed from actual data
     TRANSACTION_TYPE: 39,
     PARTY_SEQUENCE: 40,
     MODIFIED_DATE: 41
 };
 
 /**
- * Parse recording date from NUMBER(8) format (YYYYMMDD)
+ * Parse recording date from MMDDYYYY format (Miami-Dade Clerk format)
  */
 function parseRecordingDate(value) {
     if (!value || value === '0') return null;
     const str = String(value).padStart(8, '0');
-    const year = str.slice(0, 4);
-    const month = str.slice(4, 6);
-    const day = str.slice(6, 8);
+
+    // Miami-Dade uses MMDDYYYY format, not YYYYMMDD
+    const month = str.slice(0, 2);
+    const day = str.slice(2, 4);
+    const year = str.slice(4, 8);
 
     // Validate date components
     if (parseInt(year) < 1900 || parseInt(year) > 2100) return null;
