@@ -1,9 +1,25 @@
 bizleadfinders.com, www.bizleadfinders.com {
-    reverse_proxy app:8080
+    request_body {
+        max_size 500MB
+    }
+    reverse_proxy app:8080 {
+        transport http {
+            read_timeout 300s
+            write_timeout 300s
+        }
+    }
 }
 
 app.bizleadfinders.com {
-    reverse_proxy app:8080
+    request_body {
+        max_size 500MB
+    }
+    reverse_proxy app:8080 {
+        transport http {
+            read_timeout 300s
+            write_timeout 300s
+        }
+    }
 }
 
 crm.bizleadfinders.com {
