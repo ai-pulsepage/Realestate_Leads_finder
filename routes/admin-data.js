@@ -20,6 +20,12 @@ const {
     cleanupExtractedFiles,
 } = require('../services/officialRecordsParser');
 
+const {
+    processMDPAFile,
+    importMDPAToDatabase,
+    detectFileType,
+} = require('../services/mdpaParser');
+
 // Base directory for data storage (outside the code build)
 const DATA_DIR = process.env.DATA_DIR || '/var/data/imports';
 
@@ -394,36 +400,60 @@ async function processImportJob(pool, file, job) {
             errors: 0,
         };
 
-        // Process each file
-        for (const expFile of expFiles) {
-            console.log(`📂 Processing: ${expFile}`);
+        // Process each file based on detected type
+        for (const dataFile of expFiles) {
+            console.log(`📂 Processing: ${dataFile}`);
 
-            const { records, stats } = await processOfficialRecordsFile(expFile, {
-                filterDeeds: true,
-                includeDistress: true,
-                onProgress: async (s) => {
-                    await updateJob({
-                        records_processed: totalStats.processed + s.parsedRecords,
-                    });
+            const fileType = detectFileType(dataFile);
+            console.log(`   File type detected: ${fileType}`);
+
+            if (fileType === 'mdpa_csv' || fileType === 'csv') {
+                // Process as MDPA/CSV file
+                const { records, stats } = await processMDPAFile(dataFile, {
+                    onProgress: async (s) => {
+                        await updateJob({
+                            records_processed: totalStats.processed + s.parsedRecords,
+                        });
+                    }
+                });
+
+                totalStats.processed += stats.parsedRecords;
+
+                if (records.length > 0) {
+                    const importStats = await importMDPAToDatabase(pool, records, file.county);
+                    totalStats.imported += importStats.inserted;
+                    totalStats.updated += importStats.updated;
+                    totalStats.errors += importStats.errors;
                 }
-            });
+            } else {
+                // Process as Official Records (caret-delimited)
+                const { records, stats } = await processOfficialRecordsFile(dataFile, {
+                    filterDeeds: true,
+                    includeDistress: true,
+                    onProgress: async (s) => {
+                        await updateJob({
+                            records_processed: totalStats.processed + s.parsedRecords,
+                        });
+                    }
+                });
 
-            totalStats.processed += stats.parsedRecords;
+                totalStats.processed += stats.parsedRecords;
 
-            // Import deed records
-            const deedRecords = records.filter(r => r.isDeed);
-            if (deedRecords.length > 0) {
-                const importStats = await importRecordsToDatabase(pool, deedRecords, file.county);
-                totalStats.imported += importStats.inserted;
-                totalStats.updated += importStats.updated;
-                totalStats.errors += importStats.errors;
-            }
+                // Import deed records
+                const deedRecords = records.filter(r => r.isDeed);
+                if (deedRecords.length > 0) {
+                    const importStats = await importRecordsToDatabase(pool, deedRecords, file.county);
+                    totalStats.imported += importStats.inserted;
+                    totalStats.updated += importStats.updated;
+                    totalStats.errors += importStats.errors;
+                }
 
-            // Import distress records
-            const distressRecords = records.filter(r => r.isDistress);
-            if (distressRecords.length > 0) {
-                const distressStats = await importDistressRecords(pool, distressRecords, file.county);
-                totalStats.updated += distressStats.updated;
+                // Import distress records
+                const distressRecords = records.filter(r => r.isDistress);
+                if (distressRecords.length > 0) {
+                    const distressStats = await importDistressRecords(pool, distressRecords, file.county);
+                    totalStats.updated += distressStats.updated;
+                }
             }
         }
 
