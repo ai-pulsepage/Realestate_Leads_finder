@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
-import { LogOut, Home, Users, Gift, DollarSign, Settings, BarChart3, Menu, X } from 'lucide-react';
+import { LogOut, Home, Users, Gift, DollarSign, Settings, BarChart3, Menu, X, Database } from 'lucide-react';
 
 export default function AdminLayout() {
     const navigate = useNavigate();
@@ -35,6 +35,7 @@ export default function AdminLayout() {
     const navItems = [
         { path: '/admin/dashboard', label: 'Dashboard', icon: Home },
         { path: '/admin/referrers', label: 'Referrers', icon: Users },
+        { path: '/admin/data-import', label: 'Data Import', icon: Database },
         { path: '/admin/coupons', label: 'Coupons', icon: Gift },
         { path: '/admin/commissions', label: 'Commissions', icon: DollarSign },
         { path: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
@@ -65,8 +66,8 @@ export default function AdminLayout() {
                             key={path}
                             to={path}
                             className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors ${isActive(path)
-                                    ? 'bg-purple-600/30 text-white font-medium border-l-4 border-purple-500'
-                                    : 'text-gray-300 hover:bg-white/10 hover:text-white'
+                                ? 'bg-purple-600/30 text-white font-medium border-l-4 border-purple-500'
+                                : 'text-gray-300 hover:bg-white/10 hover:text-white'
                                 }`}
                         >
                             <Icon className="w-5 h-5" />

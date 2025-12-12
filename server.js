@@ -146,6 +146,10 @@ try {
   const adminCouponsRoutes = require('./routes/admin-coupons');
   console.log('  ✓ Admin Coupons');
 
+  console.log('  Loading admin-data...');
+  const adminDataRoutes = require('./routes/admin-data');
+  console.log('  ✓ Admin Data');
+
   console.log('  Loading twilio...');
   const twilioRoutes = require('./routes/twilio');
   console.log('  ✓ Twilio');
@@ -175,6 +179,7 @@ try {
   app.use('/api/token-pricing', checkDatabase, authenticateToken, tokenPricingRoutes); // [NEW]
   app.use('/api/admin/referrers', checkDatabase, authenticateToken, adminReferrersRoutes); // [REFERRAL SYSTEM]
   app.use('/api/admin/coupons', checkDatabase, authenticateToken, adminCouponsRoutes); // [COUPON SYSTEM]
+  app.use('/api/admin/data', checkDatabase, authenticateToken, adminDataRoutes); // [DATA IMPORT SYSTEM]
   console.log('✓ Routes mounted');
 
   app.use((err, req, res, next) => {

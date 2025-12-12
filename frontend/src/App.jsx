@@ -21,6 +21,7 @@ import FSBO from './pages/investor/FSBO';
 import FlipCalculator from './pages/investor/FlipCalculator';
 import AdminDashboard from './pages/admin/Dashboard';
 import AdminReferrers from './pages/admin/Referrers';
+import DataImport from './pages/admin/DataImport';
 
 // ============================================================
 // AUTH HELPER - Check if user is logged in
@@ -226,6 +227,7 @@ function App() {
           <Route path="commissions" element={<div className="p-8 text-center text-gray-500">Commissions - Coming Soon</div>} />
           <Route path="analytics" element={<div className="p-8 text-center text-gray-500">Analytics - Coming Soon</div>} />
           <Route path="settings" element={<div className="p-8 text-center text-gray-500">Settings - Coming Soon</div>} />
+          <Route path="data-import" element={<DataImport />} />
         </Route>
 
         {/* Explicit Waitlist Route (Accessible from anywhere if needed, or just root) */}
