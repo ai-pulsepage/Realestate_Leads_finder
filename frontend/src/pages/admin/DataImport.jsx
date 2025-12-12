@@ -6,7 +6,7 @@ const DataImport = () => {
     const [files, setFiles] = useState([]);
     const [counties, setCounties] = useState([]);
     const [selectedCounty, setSelectedCounty] = useState('MiamiDade');
-    const [selectedDataType, setSelectedDataType] = useState('records');
+    const [selectedDataType, setSelectedDataType] = useState('municipal_roll');
     const [uploading, setUploading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
     const [dragActive, setDragActive] = useState(false);
@@ -169,8 +169,8 @@ const DataImport = () => {
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id)}
                             className={`px-6 py-3 font-medium text-sm border-b-2 transition-colors ${activeTab === tab.id
-                                    ? 'border-blue-500 text-blue-600'
-                                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                                ? 'border-blue-500 text-blue-600'
+                                : 'border-transparent text-gray-500 hover:text-gray-700'
                                 }`}
                         >
                             {tab.label}
@@ -204,9 +204,15 @@ const DataImport = () => {
                                     onChange={(e) => setSelectedDataType(e.target.value)}
                                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 >
-                                    <option value="records">Official Records (Deeds, Liens)</option>
-                                    <option value="property_appraiser">Property Appraiser Data</option>
+                                    <option value="municipal_roll">🏠 Municipal Roll (All Properties + Sales)</option>
+                                    <option value="records">📋 Daily Records (Deeds, Liens)</option>
+                                    <option value="property_appraiser">📊 Property Appraiser (Parcel Data)</option>
                                 </select>
+                                <p className="mt-1 text-xs text-gray-500">
+                                    {selectedDataType === 'municipal_roll' && 'Complete property data with addresses, owners, and last 3 sales. Best for new homeowner leads.'}
+                                    {selectedDataType === 'records' && 'Daily deed recordings from Clerk of Courts. Use for up-to-date sale transactions.'}
+                                    {selectedDataType === 'property_appraiser' && 'Basic parcel data without sales. Use for property info updates.'}
+                                </p>
                             </div>
                         </div>
 
@@ -228,8 +234,8 @@ const DataImport = () => {
                             onDragOver={handleDrag}
                             onDrop={handleDrop}
                             className={`border-2 border-dashed rounded-xl p-12 text-center transition-colors ${dragActive
-                                    ? 'border-blue-500 bg-blue-50'
-                                    : 'border-gray-300 hover:border-gray-400'
+                                ? 'border-blue-500 bg-blue-50'
+                                : 'border-gray-300 hover:border-gray-400'
                                 }`}
                         >
                             {uploading ? (
