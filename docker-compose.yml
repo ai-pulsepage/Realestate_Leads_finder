@@ -10,6 +10,7 @@ services:
       - "8080:8080"
     volumes:
       - ./real-estate-leads-478814-fa72b6068d3b.json:/app/real-estate-leads-478814-fa72b6068d3b.json:ro
+      - /var/data/imports:/var/data/imports
     environment:
       - PORT=8080
       - DATABASE_URL=postgresql://postgres:password@db:5432/real_estate_leads
