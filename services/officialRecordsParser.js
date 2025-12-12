@@ -180,7 +180,7 @@ async function extractZipFile(zipPath) {
                 const fileName = entry.path;
                 const ext = path.extname(fileName).toLowerCase();
 
-                if (ext === '.exp' || ext === '.xls' || ext === '.txt') {
+                if (ext === '.exp' || ext === '.xls' || ext === '.txt' || ext === '.csv') {
                     const filePath = path.join(extractDir, path.basename(fileName));
                     entry.pipe(fs.createWriteStream(filePath));
                     expFiles.push(filePath);
