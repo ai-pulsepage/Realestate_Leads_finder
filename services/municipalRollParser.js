@@ -341,12 +341,16 @@ async function importMunicipalRollToDatabase(pool, records, county = 'MiamiDade'
                             appraised_value,
                             last_sale_date,
                             last_sale_price,
+                            sale_2_date,
+                            sale_2_price,
+                            sale_3_date,
+                            sale_3_price,
                             county,
                             updated_at
                         ) VALUES (
                             $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
                             $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
-                            $21, $22, $23, $24, $25, $26, NOW()
+                            $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, NOW()
                         )
                         ON CONFLICT (parcel_id) DO UPDATE SET
                             address_street = COALESCE(EXCLUDED.address_street, properties_real.address_street),
@@ -355,14 +359,27 @@ async function importMunicipalRollToDatabase(pool, records, county = 'MiamiDade'
                             owner_name = COALESCE(EXCLUDED.owner_name, properties_real.owner_name),
                             owner_name_2 = COALESCE(EXCLUDED.owner_name_2, properties_real.owner_name_2),
                             mailing_address = COALESCE(EXCLUDED.mailing_address, properties_real.mailing_address),
+                            mailing_city = COALESCE(EXCLUDED.mailing_city, properties_real.mailing_city),
+                            mailing_state = COALESCE(EXCLUDED.mailing_state, properties_real.mailing_state),
+                            mailing_zip = COALESCE(EXCLUDED.mailing_zip, properties_real.mailing_zip),
                             property_type = COALESCE(EXCLUDED.property_type, properties_real.property_type),
+                            zoning = COALESCE(EXCLUDED.zoning, properties_real.zoning),
                             sqft = COALESCE(EXCLUDED.sqft, properties_real.sqft),
+                            lot_size = COALESCE(EXCLUDED.lot_size, properties_real.lot_size),
                             bedrooms = COALESCE(EXCLUDED.bedrooms, properties_real.bedrooms),
                             baths = COALESCE(EXCLUDED.baths, properties_real.baths),
+                            stories = COALESCE(EXCLUDED.stories, properties_real.stories),
+                            units = COALESCE(EXCLUDED.units, properties_real.units),
                             year_built = COALESCE(EXCLUDED.year_built, properties_real.year_built),
+                            land_value = COALESCE(EXCLUDED.land_value, properties_real.land_value),
+                            building_value = COALESCE(EXCLUDED.building_value, properties_real.building_value),
                             appraised_value = COALESCE(EXCLUDED.appraised_value, properties_real.appraised_value),
                             last_sale_date = COALESCE(EXCLUDED.last_sale_date, properties_real.last_sale_date),
                             last_sale_price = COALESCE(EXCLUDED.last_sale_price, properties_real.last_sale_price),
+                            sale_2_date = COALESCE(EXCLUDED.sale_2_date, properties_real.sale_2_date),
+                            sale_2_price = COALESCE(EXCLUDED.sale_2_price, properties_real.sale_2_price),
+                            sale_3_date = COALESCE(EXCLUDED.sale_3_date, properties_real.sale_3_date),
+                            sale_3_price = COALESCE(EXCLUDED.sale_3_price, properties_real.sale_3_price),
                             updated_at = NOW()
                     `, [
                         record.parcelId,
@@ -390,6 +407,10 @@ async function importMunicipalRollToDatabase(pool, records, county = 'MiamiDade'
                         record.assessedValue,
                         record.lastSaleDate,
                         record.lastSalePrice,
+                        record.sale2Date,
+                        record.sale2Price,
+                        record.sale3Date,
+                        record.sale3Price,
                         county
                     ]);
 
