@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Upload, FileText, CheckCircle, XCircle, Clock, RefreshCw, Folder, ChevronRight, Play, Loader } from 'lucide-react';
+import { Upload, FileText, CheckCircle, XCircle, Clock, RefreshCw, Folder, ChevronRight, Play, Loader, Trash2 } from 'lucide-react';
 import apiClient from '../../api/client';
 
 const DataImport = () => {
@@ -112,6 +112,21 @@ const DataImport = () => {
             loadHistory();
         } catch (err) {
             setMessage({ type: 'error', text: err.response?.data?.error || 'Failed to start import' });
+        }
+    };
+
+    const deleteFile = async (fileId, filename) => {
+        if (!window.confirm(`Delete "${filename}"?\n\nThis will remove the file and its import records.`)) {
+            return;
+        }
+        try {
+            setMessage(null);
+            await apiClient.delete(`/admin/data/files/${fileId}`);
+            setMessage({ type: 'success', text: `Deleted: ${filename}` });
+            loadFiles();
+            loadHistory();
+        } catch (err) {
+            setMessage({ type: 'error', text: err.response?.data?.error || 'Failed to delete file' });
         }
     };
 
@@ -339,18 +354,27 @@ const DataImport = () => {
                                                 {file.records_imported?.toLocaleString() || '-'}
                                             </td>
                                             <td className="px-4 py-3">
-                                                {file.status === 'pending' && (
+                                                <div className="flex items-center space-x-2">
+                                                    {file.status === 'pending' && (
+                                                        <button
+                                                            onClick={() => startImport(file.file_id)}
+                                                            className="flex items-center px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700"
+                                                        >
+                                                            <Play className="w-4 h-4 mr-1" />
+                                                            Import
+                                                        </button>
+                                                    )}
+                                                    {file.status === 'completed' && (
+                                                        <span className="text-sm text-green-600">✓ Imported</span>
+                                                    )}
                                                     <button
-                                                        onClick={() => startImport(file.file_id)}
-                                                        className="flex items-center px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700"
+                                                        onClick={() => deleteFile(file.file_id, file.original_filename)}
+                                                        className="flex items-center px-2 py-1.5 text-sm text-red-600 hover:text-red-800 hover:bg-red-50 rounded"
+                                                        title="Delete file"
                                                     >
-                                                        <Play className="w-4 h-4 mr-1" />
-                                                        Import
+                                                        <Trash2 className="w-4 h-4" />
                                                     </button>
-                                                )}
-                                                {file.status === 'completed' && (
-                                                    <span className="text-sm text-green-600">✓ Imported</span>
-                                                )}
+                                                </div>
                                             </td>
                                         </tr>
                                     ))}

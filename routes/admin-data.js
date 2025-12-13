@@ -139,6 +139,61 @@ router.get('/files', async (req, res) => {
 });
 
 /**
+ * DELETE /api/admin/data/files/:fileId
+ * Delete a file record and its associated file from disk
+ */
+router.delete('/files/:fileId', async (req, res) => {
+    const { fileId } = req.params;
+
+    try {
+        // Get file info first
+        const fileResult = await req.pool.query(
+            'SELECT * FROM data_import_files WHERE file_id = $1',
+            [fileId]
+        );
+
+        if (fileResult.rows.length === 0) {
+            return res.status(404).json({ error: 'File not found' });
+        }
+
+        const file = fileResult.rows[0];
+
+        // Delete associated jobs first (foreign key constraint)
+        await req.pool.query(
+            'DELETE FROM data_import_jobs WHERE file_id = $1',
+            [fileId]
+        );
+
+        // Delete the database record
+        await req.pool.query(
+            'DELETE FROM data_import_files WHERE file_id = $1',
+            [fileId]
+        );
+
+        // Delete the file from disk if it exists
+        if (file.gcs_path && fs.existsSync(file.gcs_path)) {
+            fs.unlinkSync(file.gcs_path);
+            console.log(`Deleted file: ${file.gcs_path}`);
+        }
+
+        // Also try to clean up extracted folder if exists
+        const extractedDir = path.dirname(file.gcs_path);
+        const extractedPattern = path.join(extractedDir, `extracted_*`);
+        // Note: We don't delete extracted dirs here as they might be shared
+
+        res.json({
+            success: true,
+            message: `Deleted file: ${file.original_filename}`,
+            deletedFile: file.gcs_path
+        });
+
+    } catch (err) {
+        console.error('Error deleting file:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+/**
  * POST /api/admin/data/upload
  * Upload a data file to VM storage
  */
