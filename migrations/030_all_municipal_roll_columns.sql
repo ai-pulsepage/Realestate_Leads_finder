@@ -35,8 +35,18 @@ ALTER TABLE properties_real ADD COLUMN IF NOT EXISTS sale_2_price DECIMAL(12,2);
 ALTER TABLE properties_real ADD COLUMN IF NOT EXISTS sale_3_date DATE;
 ALTER TABLE properties_real ADD COLUMN IF NOT EXISTS sale_3_price DECIMAL(12,2);
 
--- Extra features (pool, etc. - XF columns from Municipal Roll)
-ALTER TABLE properties_real ADD COLUMN IF NOT EXISTS extra_features TEXT;
+-- Specific feature flags for service provider targeting
+ALTER TABLE properties_real ADD COLUMN IF NOT EXISTS has_pool BOOLEAN DEFAULT FALSE;
+ALTER TABLE properties_real ADD COLUMN IF NOT EXISTS has_fence BOOLEAN DEFAULT FALSE;
+ALTER TABLE properties_real ADD COLUMN IF NOT EXISTS has_patio BOOLEAN DEFAULT FALSE;
+ALTER TABLE properties_real ADD COLUMN IF NOT EXISTS has_sprinkler BOOLEAN DEFAULT FALSE;
+ALTER TABLE properties_real ADD COLUMN IF NOT EXISTS has_elevator BOOLEAN DEFAULT FALSE;
+ALTER TABLE properties_real ADD COLUMN IF NOT EXISTS has_central_ac BOOLEAN DEFAULT FALSE;
+
+-- Store raw extra features text for reference
+ALTER TABLE properties_real ADD COLUMN IF NOT EXISTS extra_features_1 VARCHAR(255);
+ALTER TABLE properties_real ADD COLUMN IF NOT EXISTS extra_features_2 VARCHAR(255);
+ALTER TABLE properties_real ADD COLUMN IF NOT EXISTS extra_features_3 VARCHAR(255);
 
 -- Indexes for common queries
 CREATE INDEX IF NOT EXISTS idx_properties_bedrooms ON properties_real(bedrooms);
@@ -47,6 +57,14 @@ CREATE INDEX IF NOT EXISTS idx_properties_property_type ON properties_real(prope
 CREATE INDEX IF NOT EXISTS idx_properties_address_city ON properties_real(address_city);
 CREATE INDEX IF NOT EXISTS idx_properties_address_zip ON properties_real(address_zip);
 CREATE INDEX IF NOT EXISTS idx_properties_sale_2_date ON properties_real(sale_2_date);
+
+-- Feature indexes for service provider targeting
+CREATE INDEX IF NOT EXISTS idx_properties_has_pool ON properties_real(has_pool) WHERE has_pool = TRUE;
+CREATE INDEX IF NOT EXISTS idx_properties_has_fence ON properties_real(has_fence) WHERE has_fence = TRUE;
+CREATE INDEX IF NOT EXISTS idx_properties_has_patio ON properties_real(has_patio) WHERE has_patio = TRUE;
+CREATE INDEX IF NOT EXISTS idx_properties_has_sprinkler ON properties_real(has_sprinkler) WHERE has_sprinkler = TRUE;
+CREATE INDEX IF NOT EXISTS idx_properties_has_elevator ON properties_real(has_elevator) WHERE has_elevator = TRUE;
+CREATE INDEX IF NOT EXISTS idx_properties_has_central_ac ON properties_real(has_central_ac) WHERE has_central_ac = TRUE;
 
 -- Verify columns exist
 SELECT column_name, data_type FROM information_schema.columns 

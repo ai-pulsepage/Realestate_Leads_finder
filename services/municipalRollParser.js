@@ -190,6 +190,20 @@ function parseRecord(fields) {
     const landUseCode = (fields[MUNROLL_COLUMNS.LAND_USE] || '').trim().slice(0, 4);
     const propertyType = PROPERTY_USE_CODES[landUseCode] || 'Other';
 
+    // Extract extra features (XF columns)
+    const xf1 = (fields[MUNROLL_COLUMNS.XF1] || '').trim().toLowerCase();
+    const xf2 = (fields[MUNROLL_COLUMNS.XF2] || '').trim().toLowerCase();
+    const xf3 = (fields[MUNROLL_COLUMNS.XF3] || '').trim().toLowerCase();
+    const allFeatures = xf1 + ' ' + xf2 + ' ' + xf3;
+
+    // Detect feature flags
+    const hasPool = allFeatures.includes('pool');
+    const hasFence = allFeatures.includes('fence');
+    const hasPatio = allFeatures.includes('patio');
+    const hasSprinkler = allFeatures.includes('sprinkler');
+    const hasElevator = allFeatures.includes('elevator');
+    const hasCentralAc = allFeatures.includes('a/c') || allFeatures.includes('ac ') || allFeatures.includes('air cond');
+
     return {
         parcelId: folio,
         addressStreet: streetAddress,
@@ -225,6 +239,17 @@ function parseRecord(fields) {
         sale2Price: parsePrice(fields[MUNROLL_COLUMNS.SALE_AMT_2]),
         sale3Date: parseSaleDate(fields[MUNROLL_COLUMNS.SALE_DATE_3]),
         sale3Price: parsePrice(fields[MUNROLL_COLUMNS.SALE_AMT_3]),
+        // Feature flags
+        hasPool: hasPool,
+        hasFence: hasFence,
+        hasPatio: hasPatio,
+        hasSprinkler: hasSprinkler,
+        hasElevator: hasElevator,
+        hasCentralAc: hasCentralAc,
+        // Raw extra features
+        extraFeatures1: (fields[MUNROLL_COLUMNS.XF1] || '').trim().slice(0, 255),
+        extraFeatures2: (fields[MUNROLL_COLUMNS.XF2] || '').trim().slice(0, 255),
+        extraFeatures3: (fields[MUNROLL_COLUMNS.XF3] || '').trim().slice(0, 255),
     };
 }
 
@@ -354,12 +379,22 @@ async function importMunicipalRollToDatabase(pool, records, county = 'MiamiDade'
                             sale_2_price,
                             sale_3_date,
                             sale_3_price,
+                            has_pool,
+                            has_fence,
+                            has_patio,
+                            has_sprinkler,
+                            has_elevator,
+                            has_central_ac,
+                            extra_features_1,
+                            extra_features_2,
+                            extra_features_3,
                             county,
                             updated_at
                         ) VALUES (
                             $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
                             $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
-                            $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, NOW()
+                            $21, $22, $23, $24, $25, $26, $27, $28, $29, $30,
+                            $31, $32, $33, $34, $35, $36, $37, $38, $39, NOW()
                         )
                         ON CONFLICT (parcel_id) DO UPDATE SET
                             address_street = COALESCE(EXCLUDED.address_street, properties_real.address_street),
@@ -389,6 +424,15 @@ async function importMunicipalRollToDatabase(pool, records, county = 'MiamiDade'
                             sale_2_price = COALESCE(EXCLUDED.sale_2_price, properties_real.sale_2_price),
                             sale_3_date = COALESCE(EXCLUDED.sale_3_date, properties_real.sale_3_date),
                             sale_3_price = COALESCE(EXCLUDED.sale_3_price, properties_real.sale_3_price),
+                            has_pool = COALESCE(EXCLUDED.has_pool, properties_real.has_pool),
+                            has_fence = COALESCE(EXCLUDED.has_fence, properties_real.has_fence),
+                            has_patio = COALESCE(EXCLUDED.has_patio, properties_real.has_patio),
+                            has_sprinkler = COALESCE(EXCLUDED.has_sprinkler, properties_real.has_sprinkler),
+                            has_elevator = COALESCE(EXCLUDED.has_elevator, properties_real.has_elevator),
+                            has_central_ac = COALESCE(EXCLUDED.has_central_ac, properties_real.has_central_ac),
+                            extra_features_1 = COALESCE(EXCLUDED.extra_features_1, properties_real.extra_features_1),
+                            extra_features_2 = COALESCE(EXCLUDED.extra_features_2, properties_real.extra_features_2),
+                            extra_features_3 = COALESCE(EXCLUDED.extra_features_3, properties_real.extra_features_3),
                             updated_at = NOW()
                     `, [
                         record.parcelId,
@@ -420,7 +464,15 @@ async function importMunicipalRollToDatabase(pool, records, county = 'MiamiDade'
                         record.sale2Price,
                         record.sale3Date,
                         record.sale3Price,
-                        county
+                        record.hasPool,
+                        record.hasFence,
+                        record.hasPatio,
+                        record.hasSprinkler,
+                        record.hasElevator,
+                        record.hasCentralAc,
+                        record.extraFeatures1,
+                        record.extraFeatures2,
+                        record.extraFeatures3
                     ]);
 
                     stats.inserted++;
