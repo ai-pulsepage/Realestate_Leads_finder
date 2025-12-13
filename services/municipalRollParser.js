@@ -164,12 +164,17 @@ function parseSaleDate(value) {
 }
 
 /**
- * Parse price value
+ * Parse price value with overflow protection
+ * DECIMAL(12,2) max = 9,999,999,999.99
  */
+const MAX_DECIMAL_VALUE = 9999999999.99;
+
 function parsePrice(value) {
     if (!value || value === '0' || value === '') return null;
     const num = parseFloat(String(value).replace(/[,$]/g, ''));
-    return isNaN(num) || num <= 0 ? null : num;
+    if (isNaN(num) || num <= 0) return null;
+    // Cap at max to prevent numeric overflow
+    return num > MAX_DECIMAL_VALUE ? MAX_DECIMAL_VALUE : num;
 }
 
 /**
