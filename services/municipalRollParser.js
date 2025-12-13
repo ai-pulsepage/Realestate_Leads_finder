@@ -260,13 +260,21 @@ async function processMunicipalRollFile(filePath, options = {}) {
     const {
         onProgress = () => { },
         skipHeaderRows = 4,   // Skip disclaimer/header rows
+        cutoffYears = 3,      // Only import properties sold within this many years
     } = options;
+
+    // Calculate cutoff date (3 years ago by default)
+    const cutoffDate = new Date();
+    cutoffDate.setFullYear(cutoffDate.getFullYear() - cutoffYears);
+    const cutoffDateStr = cutoffDate.toISOString().split('T')[0]; // YYYY-MM-DD
 
     const stats = {
         totalLines: 0,
         parsedRecords: 0,
         withSaleDate: 0,
+        recentSales: 0,
         skippedRecords: 0,
+        skippedOldSales: 0,
         errors: 0,
     };
 
@@ -305,9 +313,18 @@ async function processMunicipalRollFile(filePath, options = {}) {
             stats.parsedRecords++;
             if (record.lastSaleDate) {
                 stats.withSaleDate++;
-            }
 
-            records.push(record);
+                // Only include if sale is within cutoff period
+                if (record.lastSaleDate >= cutoffDateStr) {
+                    stats.recentSales++;
+                    records.push(record);
+                } else {
+                    stats.skippedOldSales++;
+                }
+            } else {
+                // Skip properties without sale dates
+                stats.skippedRecords++;
+            }
 
             // Progress update every 50k lines
             if (stats.totalLines % 50000 === 0) {
@@ -320,6 +337,7 @@ async function processMunicipalRollFile(filePath, options = {}) {
     }
 
     onProgress(stats);
+    console.log(`📊 Filter: Kept ${stats.recentSales} recent sales (${cutoffYears} years), skipped ${stats.skippedOldSales} old sales`);
 
     return { records, stats };
 }
