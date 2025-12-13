@@ -191,6 +191,19 @@ function parseRecord(fields) {
     const city = (fields[MUNROLL_COLUMNS.SITE_CITY] || '').trim();
     const zip = (fields[MUNROLL_COLUMNS.SITE_ZIP] || '').trim().split('-')[0];
 
+    // Debug: Log first few records to diagnose empty fields
+    if (!parseRecord.loggedCount) parseRecord.loggedCount = 0;
+    if (parseRecord.loggedCount < 3) {
+        console.log(`[DEBUG] Record ${parseRecord.loggedCount + 1}:`);
+        console.log(`  FOLIO (pos 0): "${fields[0]}"`);
+        console.log(`  PROPERTY_ADDRESS (pos 1): "${fields[1]}"`);
+        console.log(`  SITE_CITY (pos 2): "${fields[2]}"`);
+        console.log(`  SITE_ZIP (pos 3): "${fields[3]}"`);
+        console.log(`  OWNER1 (pos 25): "${fields[25]}"`);
+        console.log(`  Total fields: ${fields.length}`);
+        parseRecord.loggedCount++;
+    }
+
     // Get property type from land use code
     const landUseCode = (fields[MUNROLL_COLUMNS.LAND_USE] || '').trim().slice(0, 4);
     const propertyType = PROPERTY_USE_CODES[landUseCode] || 'Other';
