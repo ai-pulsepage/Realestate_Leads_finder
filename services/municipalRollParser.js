@@ -490,7 +490,8 @@ async function importMunicipalRollToDatabase(pool, records, county = 'MiamiDade'
                         record.hasCentralAc,
                         record.extraFeatures1,
                         record.extraFeatures2,
-                        record.extraFeatures3
+                        record.extraFeatures3,
+                        county
                     ]);
 
                     stats.inserted++;
