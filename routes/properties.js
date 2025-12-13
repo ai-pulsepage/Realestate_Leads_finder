@@ -15,8 +15,12 @@ router.get('/', async (req, res) => {
     // Base Query on Real Data
     let query = `
       SELECT p.*,
+             p.address_street as street_address,
              p.address_street as address,
              p.address_street as full_address,
+             p.address_city as city,
+             p.address_state as state,
+             p.address_zip as zip_code,
              p.appraised_value as assessed_value,
              p.appraised_value as sale_price, -- Fallback if sale_price is needed
              l.lis_pendens_filed, l.tax_lien_filed, l.foreclosure_status, 

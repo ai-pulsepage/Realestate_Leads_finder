@@ -104,21 +104,22 @@ const ProviderDashboard = () => {
                     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                         <h2 className="text-lg font-bold text-gray-900 mb-4">Recent Activity</h2>
                         <div className="space-y-4">
-                            <ActivityItem
-                                icon="🔔"
-                                text="New project posted: 'Kitchen Remodel in Miami'"
-                                time="2 hours ago"
-                            />
-                            <ActivityItem
-                                icon="💰"
-                                text="Your bid for 'Roof Repair' was viewed"
-                                time="5 hours ago"
-                            />
-                            <ActivityItem
-                                icon="🏠"
-                                text="15 new homeowner leads in your area"
-                                time="Yesterday"
-                            />
+                            {recentActivity.length > 0 ? (
+                                recentActivity.map((activity, index) => (
+                                    <ActivityItem
+                                        key={index}
+                                        icon={activity.icon || "🔔"}
+                                        text={activity.text}
+                                        time={activity.time}
+                                    />
+                                ))
+                            ) : (
+                                <div className="text-center py-8 text-gray-500">
+                                    <div className="text-4xl mb-2">📭</div>
+                                    <p>No recent activity</p>
+                                    <p className="text-sm mt-1">New leads and project updates will appear here</p>
+                                </div>
+                            )}
                         </div>
                         <div className="mt-6 text-center">
                             <Link to="/provider/projects" className="text-blue-600 font-medium hover:text-blue-700">
